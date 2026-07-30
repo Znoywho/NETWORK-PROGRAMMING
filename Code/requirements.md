@@ -1,0 +1,11 @@
+- Client kết nối với Server và xem danh sách người chơi đang online.
+- Người chơi có thể gửi, chấp nhận hoặc từ chối lời mời thách đấu.
+- Server hỗ trợ nhiều trận đấu diễn ra đồng thời và quản lý trạng thái riêng của từng phòng.
+- Server kiểm tra tính hợp lệ của nước đi và xác định kết quả thắng, thua hoặc hòa.
+- Có giới hạn thời gian suy nghĩ cho mỗi lượt; hết thời gian được xử lý theo luật do nhóm công bố.
+- Người chơi có thể kết nối lại và tiếp tục trận đấu trong khoảng thời gian cho phép.
+- Server lưu lịch sử và kết quả các trận đấu.
+- Người dùng có thể xem danh sách các trận đấu đang diễn ra và tham gia phòng với vai trò khán giả.
+- Khán giả vào giữa trận phải nhận đầy đủ trạng thái hiện tại, sau đó nhận các cập nhật bàn chơi và thời gian theo thời gian thực.
+- Server phải phân biệt vai trò người chơi và khán giả; khán giả chỉ được xem, không được gửi nước đi hoặc thay đổi trạng thái trận đấu.
+- Khán giả có thể rời phòng mà không ảnh hưởng đến trận đấu."				
