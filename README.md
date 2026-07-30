@@ -1,19 +1,19 @@
-﻿# [PROJECT_CODE] - [PROJECT_NAME]
+﻿# UDM_16 - Game Caro trực tuyến
 
 ## Thành viên
 
 | STT | MSSV | Họ và tên | Vai trò |
 |---:|---|---|---|
-| 1 | | | |
-| 2 | | | |
-| 3 | | | |
+| 1 |089206010393 |Lê Thiên Hạo|Leader|
+| 2 |082306014560|Phạm Lê Ngọc Hân|Thành Viên|
+| 3 |067206003213|Trương Tuấn Kiệt|Thành Viên|
 | 4 | | | |
 | 5 | | | |
 | 6 | | | |
 
 ## Giới thiệu
 
-Mô tả ngắn mục tiêu, đối tượng sử dụng và phạm vi đề tài.
+Game Caro nhiều người chơi qua Server, hỗ trợ phòng đấu và đồng bộ trạng thái trận đấu.
 
 ## Kiến trúc hệ thống
 
