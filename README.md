@@ -6,7 +6,7 @@
 |---:|---|---|---|
 | 1 |089206010393| Lê Thiên Hạo | Leader |
 | 2 |082306014560| Phạm Lê Ngọc Hân | Thành viên |
-| 3 |067206003213| Trương Tuấn Kiệt | Thành viên |
+| 3 |067206003213| Trương Tấn Kiệt | Thành viên |
 | 4 |077206000886| Ngô Minh Đăng Khoa| Thành viên|
 | 5 |084206002822| Trầm Đồng Khởi| Thành viên|
 | 6 |052206000320|Nguyễn Đình Duy Khương | Thành viên|
