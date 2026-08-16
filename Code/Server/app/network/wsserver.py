@@ -25,7 +25,7 @@ manager = ConnectionManager()
 
 
 @app.websocket("/ws")
-async def websocket_endpint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
