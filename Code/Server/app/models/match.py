@@ -1,4 +1,6 @@
 from enum import Enum
+from dataclasses import dataclass
+from typing import List, Set
 from game.caro import Caro
 
 
@@ -7,11 +9,10 @@ class Role(str, Enum):
     SPECTATOR = "spectator"
 
 
-class match:
-    def __init__(self, player1, player2, match_id):
+class Match:
+    def __init__(self, player1: int, player2: int, match_id: int):
         self.player1 = player1
         self.player2 = player2
-        self.spectater: list[str] = []
         self.match_id = match_id
-
-        self.game = Caro(15, 15)
+        self.spectator: Set[int] = set()
+        self.game = Caro(rows=15, cols=15)
