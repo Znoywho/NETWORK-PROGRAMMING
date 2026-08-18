@@ -1,0 +1,41 @@
+services:
+  server:
+    build: ./Server
+    container_name: caro-server
+    ports:
+      - "8765:8765"
+    env_file:
+      - ./Server/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - caro-network
+
+  db:
+    image: postgres:18
+    container_name: caro-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: caro_pass
+      POSTGRES_DB: caro_db
+    volumes:
+      - pgdata:/var/lib/postgresql          # ← đổi từ /var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d caro_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - caro-network
+
+volumes:
+  pgdata:
+
+networks:
+  caro-network:
+    driver: bridge
