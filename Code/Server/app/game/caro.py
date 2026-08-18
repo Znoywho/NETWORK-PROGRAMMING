@@ -2,61 +2,26 @@ import random
 
 
 class Caro:
-    def __init__(self, rows: int, cols: int, winning_condition: int = 5, XO: str = "X"):
-        """
-        rows: nb of rows
-        cols: nb of cols
-        winning_condition: save the length of X/O
-        XO: current character
-        """
-        self.originXO = XO
-        self.rows = rows
-        self.cols = cols
-        self.grid = [["." for _ in range(self.cols)] for _ in range(self.rows)]
-        self.winning_condition = winning_condition
-        self.XO = XO
-        self.last_move = []
-        self.hard_ai = 7
-        self.turn = 1
-        self.ai_turn = 2
-        self.is_use_ai = False
 
-    def _get_possible_moves(self):
-        possible_moves = []
-        for x in range(self.rows):
-            for y in range(self.rows):
-                if self.grid[x][y] == ".":
-                    possible_moves.append((x, y))
+    EMPTY = None  # Trạng thái ô trống
+ 
+    PLAYER_X = "X"
+    PLAYER_O = "O"
+ 
+    STATUS_PLAYING = "playing"   # đang chơi
+    STATUS_ENDED = "ended"       # đã kết thúc
 
-        return possible_moves
-
-    def reset(self):
-        self.grid = [["." for _ in range(self.cols)] for _ in range(self.rows)]
-        self.last_move = []
-        self.turn = 1
-        self.XO = self.originXO
-
-    def _visualize_grid(self):
-        for i in range(self.rows):
-            print(self.grid[i])
-
-    def _make_move(self, X: int, Y: int):
-        if self.grid[X][Y] != ".":
-            return
-
-        self.grid[X][Y] = self.XO
-        move = (X, Y)
-        self.last_move.append(move)
-
-        if self.XO == "X":
-            self.XO = "O"
-        else:
-            self.XO = "X"
-
-        if self.turn == 1:
-            self.turn = 2
-        else:
-            self.turn = 1
+    def __init__(self, size: int = 15):
+        # ----- Task 1: Ma trận ô cờ -----
+        self.size = size
+        # grid[row][col] = None (trống) / "X" / "O"
+        self.grid = [[self.EMPTY for _ in range(size)] for _ in range(size)]
+ 
+        # ----- Task 2: Trạng thái ván đấu -----
+        self.current_turn = self.PLAYER_X   # X luôn đi trước
+        self.player_X = "Player 1"          # tên/id người chơi X (có thể gán lại)
+        self.player_O = "Player 2"          # tên/id người chơi O (có thể gán lại)
+        self.status = self.STATUS_PLAYING   # trạng thái ván đấu
 
     def _get_all_rows(self):
         return self.grid
