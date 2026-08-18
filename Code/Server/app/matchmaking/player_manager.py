@@ -1,8 +1,7 @@
 import threading
 from typing import Optional
 
-from app.matchmaking.models import Player, PlayerStatus
-
+from app.models.matchmaking_models import Player, PlayerStatus
 
 class PlayerManager:
     def __init__(self):

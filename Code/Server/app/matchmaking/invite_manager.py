@@ -2,7 +2,7 @@ import threading
 import time
 from typing import Callable, Optional
 
-from app.matchmaking.models import PlayerStatus
+from app.models.matchmaking_models import PlayerStatus
 from app.matchmaking.player_manager import PlayerManager
 from app.matchmaking.room_manager import RoomManager
 

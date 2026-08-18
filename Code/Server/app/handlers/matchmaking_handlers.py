@@ -3,7 +3,7 @@ from typing import Callable
 from app.matchmaking.player_manager import PlayerManager
 from app.matchmaking.room_manager import RoomManager
 from app.matchmaking.invite_manager import InviteManager
-from app.matchmaking.models import RoomStatus
+from app.models.matchmaking_models import RoomStatus
 
 
 class MatchmakingHandlers:
