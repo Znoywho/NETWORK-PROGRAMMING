@@ -3,87 +3,104 @@ import random
 
 class Caro:
 
-    EMPTY = None  # Trạng thái ô trống
- 
-    PLAYER_X = "X"
-    PLAYER_O = "O"
- 
-    STATUS_PLAYING = "playing"   # đang chơi
-    STATUS_ENDED = "ended"       # đã kết thúc
+    def __init__(self, rows: int, cols: int, winning_condition: int = 5, XO: str = "X"):
+        """
+        rows: nb of rows
+        cols: nb of cols
+        winning_condition: save the length of X/O
+        XO: current character
+        """
+        self.originXO = XO
+        self.rows = rows
+        self.cols = cols
+        self.grid = [["." for _ in range(self.cols)] for _ in range(self.rows)]
+        self.winning_condition = winning_condition
+        self.XO = XO
+        self.last_move = []
+        self.hard_ai = 7
+        self.turn = 1
+        self.ai_turn = 2
+        self.is_use_ai = False
 
-    def __init__(self, size: int = 15):
-        # ----- Task 1: Ma trận ô cờ -----
-        self.size = size
-        # grid[row][col] = None (trống) / "X" / "O"
-        self.grid = [[self.EMPTY for _ in range(size)] for _ in range(size)]
- 
-        # ----- Task 2: Trạng thái ván đấu -----
-        self.current_turn = self.PLAYER_X   # X luôn đi trước
-        self.player_X = "Player 1"          # tên/id người chơi X (có thể gán lại)
-        self.player_O = "Player 2"          # tên/id người chơi O (có thể gán lại)
-        self.status = self.STATUS_PLAYING   # trạng thái ván đấu
+    def _get_possible_moves(self):
+        possible_moves = []
+        for x in range(self.rows):
+            for y in range(self.rows):
+                if self.grid[x][y] == ".":
+                    possible_moves.append((x, y))
 
-    def get_cell(self, row: int, col: int):
-        """Lấy trạng thái của 1 ô (None / 'X' / 'O')"""
-        return self.grid[row][col]
- 
-    def set_cell(self, row: int, col: int, value):
-        """Đặt trạng thái cho 1 ô (đánh cờ vào ô đó)"""
-        self.grid[row][col] = value
- 
-    def is_in_bounds(self, row: int, col: int) -> bool:
-        """Kiểm tra tọa độ có nằm trong bàn cờ không"""
-        return 0 <= row < self.size and 0 <= col < self.size
- 
-    def is_empty(self, row: int, col: int) -> bool:
-        """Kiểm tra ô có đang trống không"""
-        return self.get_cell(row, col) == self.EMPTY
+        return possible_moves
 
-    def _get_all_rows(self):
-        return self.grid
+    def reset(self):
+        self.grid = [["." for _ in range(self.cols)] for _ in range(self.rows)]
+        self.last_move = []
+        self.turn = 1
+        self.XO = self.originXO
+
+    def _visualize_grid(self):
+        for i in range(self.rows):
+            print(self.grid[i])
+
+    def _make_move(self, X: int, Y: int):
+        if self.grid[X][Y] != ".":
+            return
+
+        self.grid[X][Y] = self.XO
+        move = (X, Y)
+        self.last_move.append(move)
+
+        if self.XO == "X":
+            self.XO = "O"
+        else:
+            self.XO = "X"
+
+        if self.turn == 1:
+            self.turn = 2
+        else:
+            self.turn = 1
 
     def _get_all_cols(self):
         columns = []
-        for y in range(self.size):
+        for y in range(self.cols):
             col = []
-            for x in range(self.size):
+            for x in range(self.rows):
                 col.append(self.grid[x][y])
             columns.append(col)
         return columns
 
     def _get_all_diagonals(self):
         diagonals = []
-        for y in range(self.size):
+        for y in range(self.rows):
             x = 0
             diagonal = []
-            while x < self.size and y < self.size:
+            while x < self.cols and y < self.rows:
                 diagonal.append(self.grid[x][y])
                 x += 1
                 y += 1
             diagonals.append(diagonal)
 
-        for y in range(self.size):
-            x = self.size - 1
+        for y in range(self.rows):
+            x = self.cols - 1
             diagonal = []
-            while x >= 0 and y < self.size:
+            while x >= 0 and y < self.rows:
                 diagonal.append(self.grid[x][y])
                 x -= 1
                 y += 1
             diagonals.append(diagonal)
 
-        for x in range(1, self.size):
+        for x in range(1, self.cols):
             y = 0
             diagonal = []
-            while x < self.size and y < self.size:
+            while x < self.cols and y < self.rows:
                 diagonal.append(self.grid[x][y])
                 x += 1
                 y += 1
             diagonals.append(diagonal)
 
-        for x in range(self.size - 1):
+        for x in range(self.cols - 1):
             y = 0
             diagonal = []
-            while x >= 0 and y < self.size:
+            while x >= 0 and y < self.rows:
                 diagonal.append(self.grid[x][y])
                 x -= 1
                 y += 1
@@ -141,21 +158,21 @@ class Caro:
         return winner
 
     def _is_terminate(self):
-        for x in range(self.size):
-            for y in range(self.size):
+        for x in range(self.rows):
+            for y in range(self.cols):
                 if self.grid[x][y] == ".":
                     return False
         return True
 
 
-def _create_test_board(size=15, empty=True):
+def _create_test_board(rows=15, cols=15, empty=True):
     if empty:
-        return [["."] * size for _ in range(size)]
-    return [[random.choice([".", "X", "O"]) for _ in range(size)] for _ in range(size)]
+        return [["."] * cols for _ in range(rows)]
+    return [[random.choice([".", "X", "O"]) for _ in range(cols)] for _ in range(rows)]
 
 
 if __name__ == "__main__":
     caro = Caro(5, 5, winning_condition=5)
-    caro.grid = _create_test_board(5, False)
+    caro.grid = _create_test_board(rows=5, cols=5, empty=False)
     caro._visualize_grid()
     print(caro._get_winner())
