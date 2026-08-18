@@ -32,7 +32,18 @@ NETPRO/
 ├── Code/
 │   ├── Server/
 │   │   ├── app/
+│   │   │   ├── ai/
+│   │   │   ├── game/
+│   │   │   ├── handlers/
+│   │   │   ├── models/
+│   │   │   ├── network/
+│   │   │   ├── config.py
+│   │   │   ├── db.py
+│   │   │   └── main.py
 │   │   ├── migrations/
+│   │   ├── migrations/
+│   │   ├── notebook/
+│   │   ├── tests/
 │   │   ├── Dockerfile
 │   │   ├── docker-compose.yml
 │   │   └── requirements.txt
