@@ -2,7 +2,6 @@ import random
 
 
 class Caro:
-
     def __init__(self, rows: int, cols: int, winning_condition: int = 5, XO: str = "X"):
         """
         rows: nb of rows
@@ -25,7 +24,7 @@ class Caro:
     def _get_possible_moves(self):
         possible_moves = []
         for x in range(self.rows):
-            for y in range(self.rows):
+            for y in range(self.cols):
                 if self.grid[x][y] == ".":
                     possible_moves.append((x, y))
 
@@ -50,7 +49,7 @@ class Caro:
         self.last_move.append(move)
 
         if self.XO == "X":
-            self.XO = "O"
+            self.XO = "Y"
         else:
             self.XO = "X"
 
@@ -58,6 +57,9 @@ class Caro:
             self.turn = 2
         else:
             self.turn = 1
+
+    def _get_all_rows(self):
+        return self.grid
 
     def _get_all_cols(self):
         columns = []
@@ -70,37 +72,37 @@ class Caro:
 
     def _get_all_diagonals(self):
         diagonals = []
-        for y in range(self.rows):
+        for y in range(self.cols):
             x = 0
             diagonal = []
-            while x < self.cols and y < self.rows:
+            while x < self.rows and y < self.cols:
                 diagonal.append(self.grid[x][y])
                 x += 1
                 y += 1
             diagonals.append(diagonal)
 
-        for y in range(self.rows):
-            x = self.cols - 1
+        for y in range(self.cols):
+            x = self.rows - 1
             diagonal = []
-            while x >= 0 and y < self.rows:
+            while x >= 0 and y < self.cols:
                 diagonal.append(self.grid[x][y])
                 x -= 1
                 y += 1
             diagonals.append(diagonal)
 
-        for x in range(1, self.cols):
+        for x in range(1, self.rows):
             y = 0
             diagonal = []
-            while x < self.cols and y < self.rows:
+            while x < self.rows and y < self.cols:
                 diagonal.append(self.grid[x][y])
                 x += 1
                 y += 1
             diagonals.append(diagonal)
 
-        for x in range(self.cols - 1):
+        for x in range(self.rows - 1):
             y = 0
             diagonal = []
-            while x >= 0 and y < self.rows:
+            while x >= 0 and y < self.cols:
                 diagonal.append(self.grid[x][y])
                 x -= 1
                 y += 1
@@ -165,14 +167,14 @@ class Caro:
         return True
 
 
-def _create_test_board(rows=15, cols=15, empty=True):
+def _create_test_board(size=15, empty=True):
     if empty:
-        return [["."] * cols for _ in range(rows)]
-    return [[random.choice([".", "X", "O"]) for _ in range(cols)] for _ in range(rows)]
+        return [["."] * size for _ in range(size)]
+    return [[random.choice([".", "X", "O"]) for _ in range(size)] for _ in range(size)]
 
 
 if __name__ == "__main__":
     caro = Caro(5, 5, winning_condition=5)
-    caro.grid = _create_test_board(rows=5, cols=5, empty=False)
+    caro.grid = _create_test_board(5, False)
     caro._visualize_grid()
     print(caro._get_winner())
