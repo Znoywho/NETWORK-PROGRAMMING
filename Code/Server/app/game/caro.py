@@ -23,51 +23,67 @@ class Caro:
         self.player_O = "Player 2"          # tên/id người chơi O (có thể gán lại)
         self.status = self.STATUS_PLAYING   # trạng thái ván đấu
 
+    def get_cell(self, row: int, col: int):
+        """Lấy trạng thái của 1 ô (None / 'X' / 'O')"""
+        return self.grid[row][col]
+ 
+    def set_cell(self, row: int, col: int, value):
+        """Đặt trạng thái cho 1 ô (đánh cờ vào ô đó)"""
+        self.grid[row][col] = value
+ 
+    def is_in_bounds(self, row: int, col: int) -> bool:
+        """Kiểm tra tọa độ có nằm trong bàn cờ không"""
+        return 0 <= row < self.size and 0 <= col < self.size
+ 
+    def is_empty(self, row: int, col: int) -> bool:
+        """Kiểm tra ô có đang trống không"""
+        return self.get_cell(row, col) == self.EMPTY
+
     def _get_all_rows(self):
         return self.grid
 
     def _get_all_cols(self):
         columns = []
-        for y in range(self.cols):
+        for y in range(self.size):
             col = []
-            for x in range(self.rows):
+            for x in range(self.size):
                 col.append(self.grid[x][y])
             columns.append(col)
         return columns
 
     def _get_all_diagonals(self):
         diagonals = []
-        for y in range(self.cols):
+        for y in range(self.size):
             x = 0
             diagonal = []
-            while x < self.rows and y < self.cols:
+            while x < self.size and y < self.size:
                 diagonal.append(self.grid[x][y])
                 x += 1
                 y += 1
             diagonals.append(diagonal)
 
-        for y in range(self.cols):
-            x = self.rows - 1
+        for y in range(self.size):
+            x = self.size - 1
             diagonal = []
-            while x >= 0 and y < self.cols:
+            while x >= 0 and y < self.size:
                 diagonal.append(self.grid[x][y])
                 x -= 1
                 y += 1
             diagonals.append(diagonal)
 
-        for x in range(1, self.rows):
+        for x in range(1, self.size):
             y = 0
             diagonal = []
-            while x < self.rows and y < self.cols:
+            while x < self.size and y < self.size:
                 diagonal.append(self.grid[x][y])
                 x += 1
                 y += 1
             diagonals.append(diagonal)
 
-        for x in range(self.rows - 1):
+        for x in range(self.size - 1):
             y = 0
             diagonal = []
-            while x >= 0 and y < self.cols:
+            while x >= 0 and y < self.size:
                 diagonal.append(self.grid[x][y])
                 x -= 1
                 y += 1
@@ -125,8 +141,8 @@ class Caro:
         return winner
 
     def _is_terminate(self):
-        for x in range(self.rows):
-            for y in range(self.cols):
+        for x in range(self.size):
+            for y in range(self.size):
                 if self.grid[x][y] == ".":
                     return False
         return True
