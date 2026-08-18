@@ -24,7 +24,7 @@ class Caro:
     def _get_possible_moves(self):
         possible_moves = []
         for x in range(self.rows):
-            for y in range(self.rows):
+            for y in range(self.cols):
                 if self.grid[x][y] == ".":
                     possible_moves.append((x, y))
 
@@ -49,7 +49,7 @@ class Caro:
         self.last_move.append(move)
 
         if self.XO == "X":
-            self.XO = "O"
+            self.XO = "Y"
         else:
             self.XO = "X"
 
