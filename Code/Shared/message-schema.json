@@ -1,0 +1,328 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Caro WebSocket Message Schema",
+  "description": "Schema for messages exchanged between the Caro client and server.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/login"
+    },
+    {
+      "$ref": "#/$defs/online_players"
+    },
+    {
+      "$ref": "#/$defs/invite"
+    },
+    {
+      "$ref": "#/$defs/accept_invite"
+    },
+    {
+      "$ref": "#/$defs/reject_invite"
+    },
+    {
+      "$ref": "#/$defs/make_move"
+    },
+    {
+      "$ref": "#/$defs/game_state"
+    },
+    {
+      "$ref": "#/$defs/game_result"
+    },
+    {
+      "$ref": "#/$defs/spectate"
+    },
+    {
+      "$ref": "#/$defs/leave_room"
+    },
+    {
+      "$ref": "#/$defs/error"
+    }
+  ],
+
+  "$defs": {
+
+    "login": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "login"
+        },
+        "username": {
+          "type": "string",
+          "minLength": 1
+        },
+        "playerId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "type",
+        "username"
+      ],
+      "additionalProperties": false
+    },
+
+    "online_players": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "online_players"
+        },
+        "players": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "playerId": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "playerId",
+              "username"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "type",
+        "players"
+      ],
+      "additionalProperties": false
+    },
+
+    "invite": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "invite"
+        },
+        "toPlayerId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inviteId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "type",
+        "inviteId",
+        "toPlayerId"
+      ],
+      "additionalProperties": false
+    },
+
+    "accept_invite": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "accept_invite"
+        },
+        "inviteId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "type",
+        "inviteId"
+      ],
+      "additionalProperties": false
+    },
+
+    "reject_invite": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "reject_invite"
+        },
+        "inviteId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "inviteId"
+      ],
+      "additionalProperties": false
+    },
+
+    "make_move": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "make_move"
+        },
+        "matchId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "playerId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "row": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "col": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "type",
+        "matchId",
+        "playerId",
+        "row",
+        "col"
+      ],
+      "additionalProperties": false
+    },
+
+    "game_state": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "game_state"
+        },
+        "matchId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "board": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "enum": [0, 1, 2]
+            }
+          }
+        },
+        "currentPlayerId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "playing",
+            "finished"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "matchId",
+        "board",
+        "currentPlayerId",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+
+    "game_result": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "game_result"
+        },
+        "matchId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "type": "string",
+          "enum": [
+            "win",
+            "lose",
+            "draw"
+          ]
+        },
+        "winnerId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "type",
+        "matchId",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+
+    "spectate": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "spectate"
+        },
+        "matchId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "type",
+        "matchId"
+      ],
+      "additionalProperties": false
+    },
+
+    "leave_room": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "leave_room"
+        },
+        "matchId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "type",
+        "matchId"
+      ],
+      "additionalProperties": false
+    },
+
+    "error": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "error"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "details": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "type",
+        "code",
+        "message"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
