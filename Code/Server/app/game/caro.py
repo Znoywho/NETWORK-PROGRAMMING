@@ -49,7 +49,7 @@ class Caro:
         self.last_move.append(move)
 
         if self.XO == "X":
-            self.XO = "Y"
+            self.XO = "O"
         else:
             self.XO = "X"
 
