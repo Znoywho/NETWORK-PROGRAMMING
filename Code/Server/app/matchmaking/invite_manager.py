@@ -2,9 +2,9 @@ import threading
 import time
 from typing import Callable, Optional
 
-from app.models.matchmaking_models import PlayerStatus
-from app.matchmaking.player_manager import PlayerManager
-from app.matchmaking.room_manager import RoomManager
+from models.matchmaking_models import PlayerStatus
+from matchmaking.player_manager import PlayerManager
+from matchmaking.room_manager import RoomManager
 
 
 class InviteManager:

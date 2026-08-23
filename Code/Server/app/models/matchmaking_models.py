@@ -2,7 +2,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 import time
-from app.game.caro import Caro
+from game.caro import Caro
 
 
 class PlayerStatus(Enum):

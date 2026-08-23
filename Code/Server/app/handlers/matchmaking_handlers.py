@@ -1,9 +1,9 @@
 from typing import Callable
 
-from app.matchmaking.player_manager import PlayerManager
-from app.matchmaking.room_manager import RoomManager
-from app.matchmaking.invite_manager import InviteManager
-from app.models.matchmaking_models import RoomStatus
+from matchmaking.player_manager import PlayerManager
+from matchmaking.room_manager import RoomManager
+from matchmaking.invite_manager import InviteManager
+from models.matchmaking_models import RoomStatus
 
 
 class MatchmakingHandlers:

@@ -1,10 +1,10 @@
-from connections.server import server
-
+from db import init_db
+from network.server import ServerHandler
 import asyncio
 
 
+def run():
+    init_db() 
+
 if __name__ == "__main__":
-    HOST = "localhost"
-    PORT = "8765"
-    MyServer = server(HOST, PORT)
-    asyncio.run(MyServer.serverAction())
+    init_db()

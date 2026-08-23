@@ -7,7 +7,7 @@ from websockets.server import serve
 from models.matchmaking_models import Player, Room
 from handlers.matchmaking_handlers import PlayerManager, RoomManager
 
-class handler:
+class ServerHandler:
     def __init__(self, addr, port):
         self.HOST = addr
         self.PORT = port
