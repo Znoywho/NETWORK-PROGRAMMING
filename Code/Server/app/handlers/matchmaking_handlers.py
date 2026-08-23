@@ -1,18 +1,13 @@
 from typing import Callable
 
-from app.matchmaking.player_manager import PlayerManager
-from app.matchmaking.room_manager import RoomManager
-from app.matchmaking.invite_manager import InviteManager
-from app.models.matchmaking_models import RoomStatus
+from matchmaking.player_manager import PlayerManager
+from matchmaking.room_manager import RoomManager
+from matchmaking.invite_manager import InviteManager
+from models.matchmaking_models import RoomStatus
 
 
 class MatchmakingHandlers:
-    def __init__(
-        self,
-        player_manager: PlayerManager,
-        room_manager: RoomManager,
-        invite_manager: InviteManager,
-    ):
+    def __init__(self, player_manager: PlayerManager, room_manager: RoomManager, invite_manager: InviteManager):
         self.pm = player_manager
         self.rm = room_manager
         self.im = invite_manager
@@ -49,11 +44,6 @@ class MatchmakingHandlers:
             room.status = RoomStatus.FINISHED
             self.pm.set_current_room(player_id, None)
             opponent_id = room.player_o if player_id == room.player_x else room.player_x
-            return {
-                "type": "leave_room_result",
-                "success": True,
-                "role": "player",
-                "winner": opponent_id,
-            }
+            return {"type": "leave_room_result", "success": True, "role": "player", "winner": opponent_id}
 
         return {"type": "leave_room_result", "success": False, "reason": "player_not_in_room"}
