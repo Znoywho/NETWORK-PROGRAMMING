@@ -8,9 +8,9 @@ class PlayerManager:
         self._players: dict[str, Player] = {}
         self._lock = threading.Lock()
 
-    def add_player(self, player_id: str, connection) -> Player:
+    def add_player(self, player_id: str, username: str, connection) -> Player:
         with self._lock:
-            player = Player(player_id=player_id, connection=connection)
+            player = Player(player_id=player_id, username=username, connection=connection)
             self._players[player_id] = player
             return player
 
