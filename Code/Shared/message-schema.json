@@ -37,9 +37,7 @@
       "$ref": "#/$defs/error"
     }
   ],
-
   "$defs": {
-
     "login": {
       "type": "object",
       "properties": {
@@ -61,7 +59,6 @@
       ],
       "additionalProperties": false
     },
-
     "online_players": {
       "type": "object",
       "properties": {
@@ -94,7 +91,6 @@
       ],
       "additionalProperties": false
     },
-
     "invite": {
       "type": "object",
       "properties": {
@@ -117,7 +113,6 @@
       ],
       "additionalProperties": false
     },
-
     "accept_invite": {
       "type": "object",
       "properties": {
@@ -135,7 +130,6 @@
       ],
       "additionalProperties": false
     },
-
     "reject_invite": {
       "type": "object",
       "properties": {
@@ -156,14 +150,13 @@
       ],
       "additionalProperties": false
     },
-
     "make_move": {
       "type": "object",
       "properties": {
         "type": {
           "const": "make_move"
         },
-        "matchId": {
+        "room_id": {
           "type": "string",
           "minLength": 1
         },
@@ -182,21 +175,20 @@
       },
       "required": [
         "type",
-        "matchId",
+        "room_id",
         "playerId",
         "row",
         "col"
       ],
       "additionalProperties": false
     },
-
     "game_state": {
       "type": "object",
       "properties": {
         "type": {
           "const": "game_state"
         },
-        "matchId": {
+        "room_id": {
           "type": "string",
           "minLength": 1
         },
@@ -206,7 +198,11 @@
             "type": "array",
             "items": {
               "type": "integer",
-              "enum": [0, 1, 2]
+              "enum": [
+                0,
+                1,
+                2
+              ]
             }
           }
         },
@@ -217,6 +213,7 @@
         "status": {
           "type": "string",
           "enum": [
+            "waiting",
             "playing",
             "finished"
           ]
@@ -224,21 +221,20 @@
       },
       "required": [
         "type",
-        "matchId",
+        "room_id",
         "board",
         "currentPlayerId",
         "status"
       ],
       "additionalProperties": false
     },
-
     "game_result": {
       "type": "object",
       "properties": {
         "type": {
           "const": "game_result"
         },
-        "matchId": {
+        "room_id": {
           "type": "string",
           "minLength": 1
         },
@@ -257,48 +253,45 @@
       },
       "required": [
         "type",
-        "matchId",
+        "room_id",
         "result"
       ],
       "additionalProperties": false
     },
-
     "spectate": {
       "type": "object",
       "properties": {
         "type": {
           "const": "spectate"
         },
-        "matchId": {
+        "room_id": {
           "type": "string",
           "minLength": 1
         }
       },
       "required": [
         "type",
-        "matchId"
+        "room_id"
       ],
       "additionalProperties": false
     },
-
     "leave_room": {
       "type": "object",
       "properties": {
         "type": {
           "const": "leave_room"
         },
-        "matchId": {
+        "room_id": {
           "type": "string",
           "minLength": 1
         }
       },
       "required": [
         "type",
-        "matchId"
+        "room_id"
       ],
       "additionalProperties": false
     },
-
     "error": {
       "type": "object",
       "properties": {

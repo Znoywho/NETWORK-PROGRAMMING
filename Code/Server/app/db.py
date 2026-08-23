@@ -21,5 +21,3 @@ SessionLocal = scoped_session(sessionmaker(bind=engine))
 def init_db():
     print("initialize database")
     BASE.metadata.create_all(bind = engine) 
-
-
