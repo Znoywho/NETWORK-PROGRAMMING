@@ -2,7 +2,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 import time
-from game.caro import Caro
+from app.game.caro import Caro
 
 
 class PlayerStatus(Enum):
@@ -35,6 +35,7 @@ class Room:
     status: RoomStatus = RoomStatus.WAITING
     board_instance: Optional[Caro] = None  # do module 2 (Game Logic) cấp
     spectators: set = field(default_factory=set)  # set player_id khán giả
+    players_left: set = field(default_factory=set)
     created_at: float = field(default_factory=time.time)
 
     def get_player_id_by_turn(self, turn: int) -> Optional[str]:
