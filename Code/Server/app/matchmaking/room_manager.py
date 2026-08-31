@@ -2,7 +2,7 @@ import threading
 import uuid
 from typing import Optional
 
-from app.models.matchmaking_models import Room
+from models.matchmaking_models import Room
 
 class RoomManager:
     def __init__(self):
