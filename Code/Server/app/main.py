@@ -1,10 +1,7 @@
-from db import init_db
-from network.server import ServerHandler
 import asyncio
 
-
-def run():
-    init_db() 
+from network.server import ServerHandler
 
 if __name__ == "__main__":
-    init_db()
+    myserver = ServerHandler("localhost", 8765)
+    asyncio.run(myserver.serverAction())

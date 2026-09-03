@@ -21,6 +21,11 @@ class Caro:
         self.ai_turn = 2
         self.is_use_ai = False
 
+        self.player_X = "X"
+        self.player_O = "O"
+        self.current_turn = self.player_X if XO == "X" else self.player_O
+        self.status = "playing"
+
     def _get_possible_moves(self):
         possible_moves = []
         for x in range(self.rows):
@@ -49,7 +54,7 @@ class Caro:
         self.last_move.append(move)
 
         if self.XO == "X":
-            self.XO = "Y"
+            self.XO = "O"
         else:
             self.XO = "X"
 

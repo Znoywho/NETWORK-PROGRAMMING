@@ -41,7 +41,11 @@ class PlayerManager:
     def list_online(self) -> list[dict]:
         with self._lock:
             return [
-                {"player_id": p.player_id, "status": p.status.value}
+                {
+                    "player_id": p.player_id,
+                    "user_name": p.username,
+                    "status": p.status.value
+                }
                 for p in self._players.values()
             ]
 
