@@ -4,8 +4,10 @@ import asyncio
 import json
 import time
 from websockets.server import serve
-from models.matchmaking_models import Player, Room
-from handlers.matchmaking_handlers import PlayerManager, RoomManager
+from matchmaking.invite_manager import InviteManager
+from matchmaking.player_manager import PlayerManager
+from matchmaking.room_manager import RoomManager
+from handlers.matchmaking_handlers import MatchmakingHandlers
 
 class ServerHandler:
     def __init__(self, addr, port):
@@ -13,7 +15,15 @@ class ServerHandler:
         self.PORT = port
         self.connected_users = PlayerManager()      # List of matched are opened currently
         self.rooms = RoomManager()
-
+        self.invitation = InviteManager(
+            self.connected_users,
+            self.rooms
+        )
+        self.matchmaking_handlers = MatchmakingHandlers(
+            self.connected_users,
+            self.rooms,
+            self.invitation
+        )
     def login(self, username, password):
         pass
 
@@ -29,22 +39,86 @@ class ServerHandler:
         pass 
 
     async def ServerAction(self, websocket):
-        print(f"Number of clients are active: {len(self.connected_users.list_online())}")
-        # print(f"current_room: {len(self.rooms.lis)}")
+        print(
+            f"Number of clients are active: "
+            f"{len(self.connected_users.list_online())}"
+        )
+
+        player_id = None
 
         try:
             print(f"Connected by: {websocket.remote_address}")
+
             async for message in websocket:
-                print(f"Received raw data:\n{json.loads(message)}\nfrom {websocket.remote_address}")
                 message = json.loads(message)
-                await websocket.send("Server Already received message from you")
+
+                print(
+                    f"Received raw data:\n{message}\n"
+                    f"from {websocket.remote_address}"
+                )
+
+                # Client đăng nhập
+                if message.get("type") == "login":
+                    player_id = message.get("playerId")
+
+                    if not player_id:
+                        await websocket.send(json.dumps({
+                            "type": "error",
+                            "reason": "player_id_required"
+                        }))
+                        continue
+
+                    self.connected_users.add_player(
+                        player_id,
+                        player_id,
+                        websocket
+                    )
+
+                    await websocket.send(json.dumps({
+                        "type": "login_result",
+                        "success": True,
+                        "playerId": player_id
+                    }))
+                    continue
+
+                # Client yêu cầu xem trận
+                if message.get("type") == "spectate":
+                    player = self.connected_users.get_player_by_connection(
+                        websocket
+                    )
+
+                    if not player:
+                        await websocket.send(json.dumps({
+                            "type": "spectate_result",
+                            "success": False,
+                            "reason": "player_not_found"
+                        }))
+                        continue
+
+                    result = self.matchmaking_handlers.handle_spectate(
+                        player.player_id,
+                        message
+                    )
+
+                    await websocket.send(json.dumps(result))
+                    continue
+
+                await websocket.send(
+                    "Server Already received message from you"
+                )
+
         except Exception as e:
             print(f"Error handling client: {e}")
+
         finally:
-            # unregister client
-            self.connected_users.remove_player(websocket)
-            print(f"Client disconnected. Remaining clients {len(self.connected_users.list_online())}")
-            # print(f"current_room: {len(self.rooms)}")
+            if player_id:
+                self.connected_users.remove_player(player_id)
+
+            print(
+                f"Client disconnected. "
+                f"Remaining clients "
+                f"{len(self.connected_users.list_online())}"
+            )
 
     async def serverAction(self):
         async with serve(self.ServerAction, self.HOST, self.PORT) as ser:
