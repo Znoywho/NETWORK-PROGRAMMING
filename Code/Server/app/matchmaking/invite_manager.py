@@ -1,10 +1,10 @@
 import threading
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
-from models.matchmaking_models import PlayerStatus
-from matchmaking.player_manager import PlayerManager
-from matchmaking.room_manager import RoomManager
+from app.matchmaking.player_manager import PlayerManager
+from app.matchmaking.room_manager import RoomManager
+from app.models.matchmaking_models import PlayerStatus
 
 
 class InviteManager:
@@ -14,7 +14,7 @@ class InviteManager:
         self._pending_invites: dict[str, dict] = {}
         self._lock = threading.Lock()
 
-    def send_invite(self, from_id: str, to_id: str, invite_id: Optional[str] = None) -> dict:
+    def send_invite(self, from_id: str, to_id: str, invite_id: str | None = None) -> dict:
         target = self.player_manager.get_player(to_id)
 
         if not target:
@@ -26,14 +26,10 @@ class InviteManager:
             invite_id = invite_id or f"{from_id}_{to_id}_{int(time.time() * 1000)}"
             if invite_id in self._pending_invites:
                 return {"success": False, "reason": "invite_id_in_use"}
-            self._pending_invites[invite_id] = {
-                "from": from_id,
-                "to": to_id,
-                "timestamp": time.time(),
-            }
+            self._pending_invites[invite_id] = {"from": from_id, "to": to_id, "timestamp": time.time()}
         return {"success": True, "invite_id": invite_id}
 
-    def get_invite(self, invite_id: str) -> Optional[dict]:
+    def get_invite(self, invite_id: str) -> dict | None:
         """Return a copy so callers can authorize the action before consuming it."""
         with self._lock:
             invite = self._pending_invites.get(invite_id)
@@ -54,12 +50,7 @@ class InviteManager:
         self.player_manager.set_current_room(invite["from"], room.room_id)
         self.player_manager.set_current_room(invite["to"], room.room_id)
 
-        return {
-            "success": True,
-            "room_id": room.room_id,
-            "player_x": invite["from"],
-            "player_o": invite["to"],
-        }
+        return {"success": True, "room_id": room.room_id, "player_x": invite["from"], "player_o": invite["to"]}
 
     def reject_invite(self, invite_id: str) -> dict:
         with self._lock:

@@ -2,10 +2,10 @@ import asyncio
 import json
 import logging
 
-from handlers.message import MessageHandler
-from matchmaking.invite_manager import InviteManager
-from matchmaking.player_manager import PlayerManager
-from matchmaking.room_manager import RoomManager
+from app.handlers.message import MessageHandler
+from app.matchmaking.invite_manager import InviteManager
+from app.matchmaking.player_manager import PlayerManager
+from app.matchmaking.room_manager import RoomManager
 from websockets.exceptions import ConnectionClosed
 from websockets.server import serve
 

@@ -7,11 +7,17 @@ async def hello():
     uri = "ws://localhost:8765"
 
     async with connect(uri) as websocket:
+        # message = {
+        #         "type": "create_user",
+        #         "username": "Hao",
+        #         "password": "12345",
+        #         }
         message = {
-                "type": "create_user",
-                "username": "Hao",
-                "password": "12345",
-                }
+        "type": "login",
+        "username": "Hao",
+        "password": "12345",
+        }
+
         print(f"Already sent message: {message}")
         await websocket.send(json.dumps(message))
 

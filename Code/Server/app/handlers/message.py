@@ -7,13 +7,13 @@ from datetime import datetime
 from typing import Any
 
 import bcrypt
-from db import session
-from game.caro import Caro
-from matchmaking.invite_manager import InviteManager
-from matchmaking.player_manager import PlayerManager
-from matchmaking.room_manager import RoomManager
-from models.matchmaking_models import PlayerStatus, Room, RoomStatus
-from models.user import User
+from app.db import session
+from app.game.caro import Caro
+from app.matchmaking.invite_manager import InviteManager
+from app.matchmaking.player_manager import PlayerManager
+from app.matchmaking.room_manager import RoomManager
+from app.models.matchmaking_models import PlayerStatus, Room, RoomStatus
+from app.models.user import User
 
 BOARD_ROWS = 15
 BOARD_COLS = 15

@@ -1,7 +1,7 @@
 import threading
 import uuid
 
-from models.matchmaking_models import Room
+from app.models.matchmaking_models import Room
 
 
 class RoomManager:
