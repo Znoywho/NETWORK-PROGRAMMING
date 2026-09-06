@@ -1,6 +1,7 @@
 import threading
 import uuid
-from typing import Optional
+
+from app.models.matchmaking_models import Room
 
 from app.models.matchmaking_models import Room, RoomStatus 
 
@@ -16,7 +17,7 @@ class RoomManager:
             self._rooms[room_id] = room
             return room
 
-    def get_room(self, room_id: str) -> Optional[Room]:
+    def get_room(self, room_id: str) -> Room | None:
         with self._lock:
             return self._rooms.get(room_id)
 
