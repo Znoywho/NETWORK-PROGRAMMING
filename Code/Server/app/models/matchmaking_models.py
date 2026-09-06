@@ -1,7 +1,7 @@
 import time
 from dataclasses import dataclass, field
-from enum import Enum
-
+from typing import Dict, Optional
+import time
 from app.game.caro import Caro
 
 
@@ -35,6 +35,7 @@ class Room:
     status: RoomStatus = RoomStatus.WAITING
     board_instance: Caro | None = None  # do module 2 (Game Logic) cấp
     spectators: set = field(default_factory=set)  # set player_id khán giả
+    players_left: set = field(default_factory=set)
     created_at: float = field(default_factory=time.time)
 
     def get_player_id_by_turn(self, turn: int) -> str | None:
