@@ -3,6 +3,7 @@ import uuid
 
 from app.models.matchmaking_models import Room
 
+from app.models.matchmaking_models import Room, RoomStatus 
 
 class RoomManager:
     def __init__(self):
@@ -37,3 +38,23 @@ class RoomManager:
             room = self._rooms.get(room_id)
             if room:
                 room.spectators.discard(player_id)
+
+    def mark_player_left(self, room_id: str, player_id: str) ->None:
+        with self._lock:
+            room = self._rooms.get(room_id)
+            if room:
+                room.players_left.add(player_id)
+
+    def cleanup_if_done(self, room_id: str) ->bool:
+        with self._lock:
+            room = self._rooms.get(room_id)
+            if not room:
+                return False
+
+            is_finished = room.status == RoomStatus.FINISHED
+            no_spectators = len(room.spectators) == 0
+
+            if is_finished and no_spectators:
+                del self._rooms[room_id]
+                return True
+            return False
