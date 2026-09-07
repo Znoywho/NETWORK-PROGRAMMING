@@ -199,13 +199,13 @@ class MessageHandler:
             self.session.commit()
         except Exception:
             self.session.rollback()
-            return [self._error("DATABASE_ERROR", "Could not complete login.")]
+            return [self._error("DATABASE_ERROR", "Could not complete create user.")]
 
         return [
             self._reply({
                 "type": "create_user",
                 "username": user.username,
-                "playerId": user.id
+                "playerId": str(user.id)
                 }),
             self._broadcast_online_players(),
             ]
