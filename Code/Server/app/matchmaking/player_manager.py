@@ -1,7 +1,7 @@
 import threading
-from typing import Optional
 
-from models.matchmaking_models import Player, PlayerStatus
+from app.models.matchmaking_models import Player, PlayerStatus
+
 
 class PlayerManager:
     def __init__(self):
@@ -18,7 +18,7 @@ class PlayerManager:
         with self._lock:
             self._players.pop(player_id, None)
 
-    def get_player(self, player_id: str) -> Optional[Player]:
+    def get_player(self, player_id: str) -> Player | None:
         with self._lock:
             return self._players.get(player_id)
 
@@ -30,7 +30,7 @@ class PlayerManager:
             player.status = status
             return True
 
-    def set_current_room(self, player_id: str, room_id: Optional[str]) -> bool:
+    def set_current_room(self, player_id: str, room_id: str | None) -> bool:
         with self._lock:
             player = self._players.get(player_id)
             if player is None:
@@ -48,7 +48,7 @@ class PlayerManager:
     def list_online(self) -> list[dict]:
         with self._lock:
             return [
-                {"player_id": p.player_id, "status": p.status.value}
+                {"player_id": p.player_id, "user_name": p.username, "status": p.status.value}
                 for p in self._players.values()
             ]
 
