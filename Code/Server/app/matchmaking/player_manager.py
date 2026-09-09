@@ -48,3 +48,12 @@ class PlayerManager:
     def is_online(self, player_id: str) -> bool:
         with self._lock:
             return player_id in self._players
+
+
+    def find_player_by_socket(self, connection):
+        with self._lock:
+            for info in self.list_online():
+                player = self.get_player(info["player_id"])
+                if player is not None and player.connection is connection:
+                    return player.player_id
+            return None
