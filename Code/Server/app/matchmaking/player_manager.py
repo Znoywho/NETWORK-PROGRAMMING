@@ -52,8 +52,10 @@ class PlayerManager:
 
     def find_player_by_socket(self, connection):
         with self._lock:
-            for info in self.list_online():
-                player = self.get_player(info["player_id"])
-                if player is not None and player.connection is connection:
+            # Do not call the other locking helpers here: ``Lock`` is not
+            # re-entrant, so doing so would deadlock the server's selector
+            # loop as soon as it handles a login request.
+            for player in self._players.values():
+                if player.connection is connection:
                     return player.player_id
             return None
