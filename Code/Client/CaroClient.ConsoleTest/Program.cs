@@ -5,6 +5,8 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 
 int[][] board = Array.Empty<int[]>();
 
+bool gameEnded = false;
+
 Console.Write("Địa chỉ server (Enter để dùng mặc định tcp://localhost:8765): ");
 string? uriInput = Console.ReadLine();
 
@@ -31,6 +33,29 @@ client.OnGameStateReceived += state =>
     PrintBoard(board, null);
 };
 
+client.OnGameResultReceived += result =>
+{
+    Console.WriteLine();
+    Console.WriteLine("========== KẾT QUẢ TRẬN ĐẤU ==========");
+
+    string text = result.Result switch
+    {
+        "win" => "Bạn thắng!",
+        "lose" => "Bạn thua!",
+        "draw" => "Ván đấu hòa!",
+        _ => $"Kết quả không xác định: {result.Result}"
+    };
+    Console.WriteLine(text);
+    Console.WriteLine($"Match: {result.MatchId}");
+
+    if (!string.IsNullOrWhiteSpace(result.WinnerId))
+    {
+        Console.WriteLine($"Người thắng: {result.WinnerId}");
+    }
+    
+    Console.WriteLine("========================================");
+    gameEnded = true;
+};
 connection.Disconnected += reason =>
 {
     Console.WriteLine($"[mất kết nối] {reason}");
@@ -71,10 +96,15 @@ Console.WriteLine("Nhập nước đi theo dạng: row col");
 Console.WriteLine("Ví dụ: 2 3");
 Console.WriteLine("Gõ /quit để thoát.");
 
-while (true)
+while (!gameEnded)
 {
     Console.Write("Nước đi: ");
     string? input = Console.ReadLine();
+
+    if (gameEnded)
+    {
+        break;
+    }
 
     if (input is null || input.Trim().Equals("/quit", StringComparison.OrdinalIgnoreCase))
     {
