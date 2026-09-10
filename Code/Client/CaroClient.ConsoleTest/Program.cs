@@ -1,4 +1,5 @@
 ﻿using CaroClient.Core;
+using System.Text;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
@@ -19,11 +20,15 @@ client.OnGameStateReceived += state =>
     board = state.Board;
 
     Console.WriteLine();
+    Console.WriteLine("========================================");
     Console.WriteLine($"[game_state] matchId={state.MatchId}");
     Console.WriteLine($"currentPlayerId: {state.CurrentPlayerId}");
     Console.WriteLine($"status: {state.Status}");
+    Console.WriteLine("========================================");
 
-    PrintBoard(board);
+    // Nếu sau này server trả thêm lastMove, có thể truyền vào đây.
+    // Hiện tại chưa có lastMove, nên truyền null.
+    PrintBoard(board, null);
 };
 
 connection.Disconnected += reason =>
@@ -119,29 +124,67 @@ static bool TryParseMove(string input, out int row, out int col)
     return int.TryParse(parts[0], out row) &&
            int.TryParse(parts[1], out col);
 }
-static void PrintBoard(int[][] board)
+static void PrintBoard(int[][] board, (int Row, int Col)? lastMove = null)
 {
-    Console.Write("  ");
-    for (int j = 0; j < board[0].Length; j++)
+    if (board == null || board.Length == 0 || board[0].Length == 0)
     {
-        Console.Write($"{j, 2} ");
+        Console.WriteLine("Bàn cờ trống.");
+        return;
+    }
+
+    Console.Write("    ");
+    for (int col = 0; col < board[0].Length; col++)
+    {
+        Console.Write($"{col + 1,3}");
     }
     Console.WriteLine();
 
-    for (int i = 0; i < board.Length; i++)
+    Console.Write("   ");
+    for (int col = 0; col < board[0].Length; col++)
     {
-        Console.Write($"{i, 2} ");
-        for (int j = 0; j < board[i].Length; j++)
+        Console.Write("----");
+    }
+    Console.WriteLine();
+
+    for (int row = 0; row < board.Length; row++)
+    {
+        Console.Write($"{row + 1,2} |");
+
+        for (int col = 0; col < board[row].Length; col++)
         {
-            char cell = board[i][j] switch
+            int value = board[row][col];
+            char cell = value switch
             {
-                0 => '.',
                 1 => 'X',
                 2 => 'O',
                 _ => '.'
             };
-            Console.Write($"{cell, 2} ");
+
+            bool isLastMove = lastMove.HasValue && lastMove.Value.Row == row && lastMove.Value.Col == col;
+
+            if (isLastMove)
+            {
+                Console.BackgroundColor = ConsoleColor.DarkYellow;
+                Console.ForegroundColor = ConsoleColor.Black;
+                Console.Write($"{cell,3}");
+                Console.ResetColor();
+            }
+            else
+            {
+                Console.ForegroundColor = value switch
+                {
+                    1 => ConsoleColor.Cyan,
+                    2 => ConsoleColor.Magenta,
+                    _ => ConsoleColor.Gray
+                };
+
+                Console.Write($"{cell,3}");
+                Console.ResetColor();
+            }
         }
+
         Console.WriteLine();
     }
+
+    Console.WriteLine();
 }
