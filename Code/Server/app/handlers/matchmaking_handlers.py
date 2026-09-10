@@ -38,12 +38,23 @@ class MatchmakingHandlers:
         if player_id in room.spectators:
             self.rm.remove_spectator(room_id, player_id)
             self.pm.set_current_room(player_id, None)
+            self.rm.cleanup_if_done(room_id)
             return {"type": "leave_room_result", "success": True, "role": "spectator"}
 
         if player_id in (room.player_x, room.player_o):
+            from app.models.matchmaking_models import RoomStatus
             room.status = RoomStatus.FINISHED
             self.pm.set_current_room(player_id, None)
+            self.rm.mark_player_left(room_id, player_id)
             opponent_id = room.player_o if player_id == room.player_x else room.player_x
-            return {"type": "leave_room_result", "success": True, "role": "player", "winner": opponent_id}
 
-        return {"type": "leave_room_result", "success": False, "reason": "player_not_in_room"}
+            self.rm.cleanup_if_done(room_id)
+
+            return {
+                "type": "leave_room_result",
+                "success": True,
+                "role": "player",
+                "winner": opponent_id,
+            }
+
+        return {"type": "leave_room_result", "success": False, "reason": "player_not_in_room"}      

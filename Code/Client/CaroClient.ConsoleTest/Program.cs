@@ -1,22 +1,40 @@
 ﻿using CaroClient.Core;
+
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-Console.Write("Địa chỉ server (Enter để dùng mặc định ws://localhost:8765): ");
+int[][] board = Array.Empty<int[]>();
+
+Console.Write("Địa chỉ server (Enter để dùng mặc định tcp://localhost:8765): ");
 string? uriInput = Console.ReadLine();
 
-Uri serverUri = string.IsNullOrWhiteSpace(uriInput)
-    ? new Uri("ws://localhost:8765")
-    : new Uri(uriInput.Trim());
+string serverAddress = string.IsNullOrWhiteSpace(uriInput)
+    ? "tcp://localhost:8765"
+    : uriInput.Trim();
 
 await using var connection = new CaroConnection();
+var client = new GameClient(connection);
 
-connection.MessageReceived += json => Console.WriteLine($"[nhận] {json}");
-connection.Disconnected += reason => Console.WriteLine($"[mất kết nối] {reason}");
+client.OnGameStateReceived += state =>
+{
+    board = state.Board;
+
+    Console.WriteLine();
+    Console.WriteLine($"[game_state] matchId={state.MatchId}");
+    Console.WriteLine($"currentPlayerId: {state.CurrentPlayerId}");
+    Console.WriteLine($"status: {state.Status}");
+
+    PrintBoard(board);
+};
+
+connection.Disconnected += reason =>
+{
+    Console.WriteLine($"[mất kết nối] {reason}");
+};
 
 try
 {
-    await connection.ConnectAsync(serverUri);
-    Console.WriteLine($"Đã kết nối tới {serverUri}");
+    await connection.ConnectAsync(new Uri(serverAddress));
+    Console.WriteLine($"Đã kết nối tới {serverAddress}");
 }
 catch (Exception ex)
 {
@@ -24,11 +42,33 @@ catch (Exception ex)
     return;
 }
 
-Console.WriteLine("Nhập JSON message để gửi. Gõ /quit để thoát.");
+Console.Write("Username: ");
+string username = Console.ReadLine() ?? "player1";
+
+Console.Write("PlayerId: ");
+string playerId = Console.ReadLine() ?? "p1";
+
+Console.Write("MatchId: ");
+string matchId = Console.ReadLine() ?? "match-1";
+
+try
+{
+    await client.LoginAsync(username, playerId);
+    Console.WriteLine("Đã gửi login.");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Login lỗi: {ex.Message}");
+    return;
+}
+
+Console.WriteLine("Nhập nước đi theo dạng: row col");
+Console.WriteLine("Ví dụ: 2 3");
+Console.WriteLine("Gõ /quit để thoát.");
 
 while (true)
 {
-    Console.Write("Gửi: ");
+    Console.Write("Nước đi: ");
     string? input = Console.ReadLine();
 
     if (input is null || input.Trim().Equals("/quit", StringComparison.OrdinalIgnoreCase))
@@ -36,20 +76,72 @@ while (true)
         break;
     }
 
-    if (string.IsNullOrWhiteSpace(input))
+    if (!TryParseMove(input, out int row, out int col))
     {
+        Console.WriteLine("Sai định dạng. Hãy nhập theo ví dụ: 2 3");
+        continue;
+    }
+
+    if (row < 0 || col < 0)
+    {
+        Console.WriteLine("Tọa độ phải >= 0.");
         continue;
     }
 
     try
     {
-        await connection.SendAsync(input.Trim());
+        await client.MakeMoveAsync(matchId, playerId, row, col);
+        Console.WriteLine($"Đã gửi nước đi: ({row}, {col})");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Gửi lỗi: {ex.Message}");
+        Console.WriteLine($"Gửi nước đi lỗi: {ex.Message}");
     }
 }
 
 await connection.DisconnectAsync();
 Console.WriteLine("Đã đóng kết nối.");
+
+static bool TryParseMove(string input, out int row, out int col)
+{
+    row = -1;
+    col = -1;
+
+    var parts = input.Split(
+        new[] { ' ', ',', ';', '\t' },
+        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    if (parts.Length != 2)
+    {
+        return false;
+    }
+
+    return int.TryParse(parts[0], out row) &&
+           int.TryParse(parts[1], out col);
+}
+static void PrintBoard(int[][] board)
+{
+    Console.Write("  ");
+    for (int j = 0; j < board[0].Length; j++)
+    {
+        Console.Write($"{j, 2} ");
+    }
+    Console.WriteLine();
+
+    for (int i = 0; i < board.Length; i++)
+    {
+        Console.Write($"{i, 2} ");
+        for (int j = 0; j < board[i].Length; j++)
+        {
+            char cell = board[i][j] switch
+            {
+                0 => '.',
+                1 => 'X',
+                2 => 'O',
+                _ => '.'
+            };
+            Console.Write($"{cell, 2} ");
+        }
+        Console.WriteLine();
+    }
+}
