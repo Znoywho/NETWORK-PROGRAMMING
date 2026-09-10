@@ -2,6 +2,8 @@
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
+int[][] board = Array.Empty<int[]>();
+
 Console.Write("Địa chỉ server (Enter để dùng mặc định tcp://localhost:8765): ");
 string? uriInput = Console.ReadLine();
 
@@ -11,6 +13,18 @@ string serverAddress = string.IsNullOrWhiteSpace(uriInput)
 
 await using var connection = new CaroConnection();
 var client = new GameClient(connection);
+
+client.OnGameStateReceived += state =>
+{
+    board = state.Board;
+
+    Console.WriteLine();
+    Console.WriteLine($"[game_state] matchId={state.MatchId}");
+    Console.WriteLine($"currentPlayerId: {state.CurrentPlayerId}");
+    Console.WriteLine($"status: {state.Status}");
+
+    PrintBoard(board);
+};
 
 connection.Disconnected += reason =>
 {
@@ -104,4 +118,30 @@ static bool TryParseMove(string input, out int row, out int col)
 
     return int.TryParse(parts[0], out row) &&
            int.TryParse(parts[1], out col);
+}
+static void PrintBoard(int[][] board)
+{
+    Console.Write("  ");
+    for (int j = 0; j < board[0].Length; j++)
+    {
+        Console.Write($"{j, 2} ");
+    }
+    Console.WriteLine();
+
+    for (int i = 0; i < board.Length; i++)
+    {
+        Console.Write($"{i, 2} ");
+        for (int j = 0; j < board[i].Length; j++)
+        {
+            char cell = board[i][j] switch
+            {
+                0 => '.',
+                1 => 'X',
+                2 => 'O',
+                _ => '.'
+            };
+            Console.Write($"{cell, 2} ");
+        }
+        Console.WriteLine();
+    }
 }
