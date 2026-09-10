@@ -1,9 +1,10 @@
 import uuid
 from datetime import datetime
 
-from app.db import BASE
 from sqlalchemy import UUID, DateTime, String, text
 from sqlalchemy.orm import Mapped, mapped_column
+
+from app.db import BASE
 
 # CREATE TABLE IF NOT EXISTS users (
 #     id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),

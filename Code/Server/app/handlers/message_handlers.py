@@ -169,6 +169,7 @@ class MessageHandler:
         except Exception:
             self.session.rollback()
             return [self._error("DATABASE_ERROR", "Could not complete login.")]
+        # NOTE: Register user
         self.pm.add_player(player_id, user.username, websocket)
 
         return [
@@ -199,13 +200,13 @@ class MessageHandler:
             self.session.commit()
         except Exception:
             self.session.rollback()
-            return [self._error("DATABASE_ERROR", "Could not complete login.")]
+            return [self._error("DATABASE_ERROR", "Could not complete create user.")]
 
         return [
             self._reply({
                 "type": "create_user",
                 "username": user.username,
-                "playerId": user.id
+                "playerId": str(user.id)
                 }),
             self._broadcast_online_players(),
             ]
@@ -419,11 +420,7 @@ class MessageHandler:
         ]
 
     def _find_id_by_ws(self, websocket: object) -> str | None:
-        for info in self.pm.list_online():
-            player = self.pm.get_player(info["player_id"])
-            if player is not None and player.connection is websocket:
-                return player.player_id
-        return None
+        return self.pm.find_player_by_socket(websocket)
 
     def _new_board(self) -> Caro:
         return Caro(BOARD_ROWS, BOARD_COLS, WINNING_CONDITION)
