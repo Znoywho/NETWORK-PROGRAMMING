@@ -1,9 +1,10 @@
+from typing import Dict
+import random
 import asyncio
 import json
 from app.models.match import Role, match
 
-
-class server:
+class ServerHandler:
     def __init__(self, addr, port):
         self.HOST = addr
         self.PORT = int(port)
