@@ -38,6 +38,13 @@ class PlayerManager:
             player.current_room_id = room_id
             return True
 
+    def get_player_by_connection(self, connection) -> Optional[Player]:
+        with self._lock:
+            for player in self._players.values():
+                if player.connection == connection:
+                    return player
+            return None
+
     def list_online(self) -> list[dict]:
         with self._lock:
             return [
