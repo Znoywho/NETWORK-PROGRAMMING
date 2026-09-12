@@ -25,10 +25,14 @@ class ServerHandler:
 
         self.sel = selectors.DefaultSelector()
 
+    def create_new_match(self, player1, player2):
+        # NOTE: random ID
+        self.current_match = match(player1, player2, 100)
+        print(f"Create new match!: ID {self.current_match.match_id}")
 
     def _accept(self, listener: socket.socket) -> None:
         conn, addr = listener.accept()
-        conn.setblocking(False)
+        conn.setblocking(Falhttps://github.com/Znoywho/NETWORK-PROGRAMMING/pull/25/conflict?name=Code%252FServer%252Fapp%252Fnetwork%252Fserver.py&ancestor_oid=49b30504f01d0970764c47e18e611c4ee0529e1e&base_oid=e7161e492df316f56fcd5ab08abe1bccee5d2d7e&head_oid=36dd0e72abaf5045020311c4da4a043bc3244995se)
         connection = Connection(conn, addr, self.sel)
         self.sel.register(conn, selectors.EVENT_READ, data=connection)
         logger.info("Client connected: %s", addr)
