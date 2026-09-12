@@ -1,12 +1,14 @@
-"""Application-level WebSocket message routing for Caro."""
+"""Application-level socket  message routing for Caro."""
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
 import bcrypt
+
 from app.db import session
 from app.game.caro import Caro
 from app.matchmaking.invite_manager import InviteManager
@@ -18,6 +20,9 @@ from app.models.user import User
 BOARD_ROWS = 15
 BOARD_COLS = 15
 WINNING_CONDITION = 5
+K = 32
+
+logger = logging.getLogger(__name__)
 
 
 def hash_password(password: str) -> str:
@@ -61,7 +66,7 @@ class MessageHandler:
         self.session = db_session if db_session is not None else session
         self.board_factory = board_factory or self._new_board
 
-    def handle(self, message: object, websocket: object) -> list[dict[str, Any]]:
+    def handle(self, message: object, sock: object) -> list[dict[str, Any]]:
         """Handle one decoded client message without performing socket I/O."""
         if not isinstance(message, dict):
             return [
@@ -75,12 +80,12 @@ class MessageHandler:
                     ]
 
         if message_type == "login":
-            return self._login_handler(message, websocket)
+            return self._login_handler(message, sock)
 
         if message_type == "create_user":
-            return self._create_user_hanlder(message, websocket)
+            return self._create_user_hanlder(message, sock)
 
-        player_id = self._find_id_by_ws(websocket)
+        player_id = self._find_id_by_sock(sock)
         if player_id is None:
             return [
                     self._error("UNAUTHENTICATED",
@@ -111,9 +116,9 @@ class MessageHandler:
                                 str(exc) or "Invalid message payload.")
                     ]
 
-    def disconnect(self, websocket: object) -> list[dict[str, Any]]:
+    def disconnect(self, sock: object) -> list[dict[str, Any]]:
         """Remove a disconnected player and notify affected connected clients."""
-        player_id = self._find_id_by_ws(websocket)
+        player_id = self._find_id_by_sock(sock)
         if player_id is None:
             return []
 
@@ -139,7 +144,7 @@ class MessageHandler:
         deliveries.append(self._broadcast_online_players())
         return deliveries
 
-    def _login_handler(self, message: dict[str, Any], websocket: object) -> list[dict[str, Any]]:
+    def _login_handler(self, message: dict[str, Any], sock: object) -> list[dict[str, Any]]:
         username = message.get("username")
         password = message.get("password")
         if not isinstance(username, str) or not username.strip():
@@ -147,7 +152,7 @@ class MessageHandler:
         if not isinstance(password, str):
             return [self._error("INVALID_MESSAGE", "password is required.")]
 
-        current_player_id = self._find_id_by_ws(websocket)
+        current_player_id = self._find_id_by_sock(sock)
         # Avoid duplicated player_id
         if current_player_id is not None:
             return [self._error("ALREADY_AUTHENTICATED", "This connection is already logged in.")]
@@ -160,7 +165,7 @@ class MessageHandler:
 
         player_id = str(user.id)
         existing_player = self.pm.get_player(player_id)
-        if existing_player is not None and existing_player.connection is not websocket:
+        if existing_player is not None and existing_player.connection is not sock:
             return [self._error("ALREADY_ONLINE", "This user is already online.")]
 
         user.last_login_at = datetime.now()
@@ -170,7 +175,7 @@ class MessageHandler:
             self.session.rollback()
             return [self._error("DATABASE_ERROR", "Could not complete login.")]
         # NOTE: Register user
-        self.pm.add_player(player_id, user.username, websocket)
+        self.pm.add_player(player_id, user.username, sock)
 
         return [
             self._reply({
@@ -182,7 +187,7 @@ class MessageHandler:
         ]
 
 
-    def _create_user_hanlder(self, message, websocket):
+    def _create_user_hanlder(self, message, sock):
         user = self._check_user(message.get("username").strip())
         if user is not None:
             return [self._error("USER_ALREADY_EXIST", "This user already exist")]
@@ -208,10 +213,24 @@ class MessageHandler:
                 "username": user.username,
                 "playerId": str(user.id)
                 }),
-            self._broadcast_online_players(),
             ]
 
-
+    def changeUser(self, user: User):
+        if user:
+            try:
+                self.session.commit()
+            except Exception:
+                self.session.rollback()
+                return [self._error("DATABASE_ERROR", "Could not change information of user.")]
+        else:
+                return [self._error("DATABASE_ERROR", "Could not change information of user.")]
+        return [
+            self._reply({
+                "type": "create_user",
+                "username": user.username,
+                "playerId": str(user.id)
+                }),
+            ]
 
     def _online_players_handler(self, _player_id: str, _message: dict[str, Any]) -> list[dict[str, Any]]:
         return [
@@ -332,6 +351,7 @@ class MessageHandler:
             return [self._targeted(recipients, self._game_state(room))]
 
         room.status = RoomStatus.FINISHED
+        self.score_player(room, winner)
         winner_id = room.player_x if winner == 0 else room.player_o if winner == 1 else None
         for room_player_id in (room.player_x, room.player_o):
             self._set_player_idle(room_player_id)
@@ -343,6 +363,36 @@ class MessageHandler:
             *self._game_result_deliveries(room.room_id, winner_id, [room.player_x, room.player_o]),
             self._broadcast_online_players(),
         ]
+
+
+    def score_player(self, room: Room, winner: int):
+        if room.status != RoomStatus.FINISHED:
+            return [self._error("ROOM_NOT_FINISHED", "Game room was not finished.")]
+
+        player_x_user = self.session.query(User).filter(User.id == room.player_x).first()
+        player_o_user = self.session.query(User).filter(User.id == room.player_o).first()
+
+        if player_x_user is None or player_o_user is None:
+            return [self._error(code="USER_NOT_FOUND", message="Player user not found.")]
+
+        E_X = 1 / (1 + 10 ** ((player_o_user.ranking - player_x_user.ranking) / 400))
+        E_O = 1 / (1 + 10 ** ((player_x_user.ranking - player_o_user.ranking) / 400))
+
+        if winner == 0:      
+            S_X, S_O = 1, 0
+        elif winner == 1:    
+            S_X, S_O = 0, 1
+        else:                
+            S_X, S_O = 0.5, 0.5
+
+        player_x_user.ranking += int(K * (S_X - E_X))
+        player_o_user.ranking += int(K * (S_O - E_O))
+
+        try:
+            self.session.commit()
+        except Exception as e:
+            self.session.rollback()
+            logger.error(f"Scoring failed for room {room.room_id}: {e}")
 
     def _spectate_handler(self, player_id: str, message: dict[str, Any]) -> list[dict[str, Any]]:
         room_id = message.get("room_id")
@@ -419,8 +469,8 @@ class MessageHandler:
             for info in self.pm.list_online()
         ]
 
-    def _find_id_by_ws(self, websocket: object) -> str | None:
-        return self.pm.find_player_by_socket(websocket)
+    def _find_id_by_sock(self, sock: object) -> str | None:
+        return self.pm.find_player_by_socket(sock)
 
     def _new_board(self) -> Caro:
         return Caro(BOARD_ROWS, BOARD_COLS, WINNING_CONDITION)
