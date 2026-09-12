@@ -1,16 +1,16 @@
 import threading
-from typing import Optional
 
 from app.models.matchmaking_models import Player, PlayerStatus
+
 
 class PlayerManager:
     def __init__(self):
         self._players: dict[str, Player] = {}
         self._lock = threading.Lock()
 
-    def add_player(self, player_id: str, connection) -> Player:
+    def add_player(self, player_id: str, username: str, connection) -> Player:
         with self._lock:
-            player = Player(player_id=player_id, connection=connection)
+            player = Player(player_id=player_id, username=username, connection=connection)
             self._players[player_id] = player
             return player
 
@@ -18,7 +18,7 @@ class PlayerManager:
         with self._lock:
             self._players.pop(player_id, None)
 
-    def get_player(self, player_id: str) -> Optional[Player]:
+    def get_player(self, player_id: str) -> Player | None:
         with self._lock:
             return self._players.get(player_id)
 
@@ -30,7 +30,7 @@ class PlayerManager:
             player.status = status
             return True
 
-    def set_current_room(self, player_id: str, room_id: Optional[str]) -> bool:
+    def set_current_room(self, player_id: str, room_id: str | None) -> bool:
         with self._lock:
             player = self._players.get(player_id)
             if player is None:
@@ -41,10 +41,21 @@ class PlayerManager:
     def list_online(self) -> list[dict]:
         with self._lock:
             return [
-                {"player_id": p.player_id, "status": p.status.value}
+                {"player_id": p.player_id, "user_name": p.username, "status": p.status.value}
                 for p in self._players.values()
             ]
 
     def is_online(self, player_id: str) -> bool:
         with self._lock:
             return player_id in self._players
+
+
+    def find_player_by_socket(self, connection):
+        with self._lock:
+            # Do not call the other locking helpers here: ``Lock`` is not
+            # re-entrant, so doing so would deadlock the server's selector
+            # loop as soon as it handles a login request.
+            for player in self._players.values():
+                if player.connection is connection:
+                    return player.player_id
+            return None
