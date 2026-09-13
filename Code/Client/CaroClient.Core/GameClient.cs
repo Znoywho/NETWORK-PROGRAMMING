@@ -14,6 +14,10 @@ namespace CaroClient.Core
 
         public event Action<GameStateMessage>? OnGameStateReceived;
         public event Action<GameResultMessage>? OnGameResultReceived;
+        public event Action<OnlinePlayersMessage>? OnOnlinePlayersReceived;
+        public event Action<InviteReceivedMessage>? OnInviteReceived;
+        public event Action<InviteAcceptedMessage>? OnInviteAccepted;
+        public event Action<InviteRejectedMessage>? OnInviteRejected;
         public event Action<string>? OnErrorReceived;
 
         public GameClient(CaroConnection connection)
@@ -24,7 +28,7 @@ namespace CaroClient.Core
 
         public async Task ConnectAsync(string uri)
         {
-            await _connection.ConnectAsync(uri);
+            await _connection.ConnectAsync(new Uri(uri));
         }
 
         public async Task LoginAsync(string username, string? playerId = null)
@@ -62,6 +66,12 @@ namespace CaroClient.Core
             };
 
             string json = JsonSerializer.Serialize(msg, JsonOptions);
+            await _connection.SendAsync(json);
+        }
+
+        public async Task GetOnlinePlayersAsync()
+        {
+            string json = JsonSerializer.Serialize(new GetOnlinePlayersMessage(), JsonOptions);
             await _connection.SendAsync(json);
         }
 
@@ -108,6 +118,26 @@ namespace CaroClient.Core
                     case "game_result":
                         var resultMsg = JsonSerializer.Deserialize<GameResultMessage>(json, JsonOptions);
                         if (resultMsg != null) OnGameResultReceived?.Invoke(resultMsg);
+                        break;
+
+                    case "online_players":
+                        var playersMsg = JsonSerializer.Deserialize<OnlinePlayersMessage>(json, JsonOptions);
+                        if (playersMsg != null) OnOnlinePlayersReceived?.Invoke(playersMsg);
+                        break;
+
+                    case "invite_received":
+                        var inviteMsg = JsonSerializer.Deserialize<InviteReceivedMessage>(json, JsonOptions);
+                        if (inviteMsg != null) OnInviteReceived?.Invoke(inviteMsg);
+                        break;
+
+                    case "invite_accepted":
+                        var acceptedMsg = JsonSerializer.Deserialize<InviteAcceptedMessage>(json, JsonOptions);
+                        if (acceptedMsg != null) OnInviteAccepted?.Invoke(acceptedMsg);
+                        break;
+
+                    case "invite_rejected":
+                        var rejectedMsg = JsonSerializer.Deserialize<InviteRejectedMessage>(json, JsonOptions);
+                        if (rejectedMsg != null) OnInviteRejected?.Invoke(rejectedMsg);
                         break;
 
                     case "error":
