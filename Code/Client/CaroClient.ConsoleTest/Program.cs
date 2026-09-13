@@ -1,17 +1,25 @@
 ﻿using CaroClient.Core;
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-Console.Write("Địa chỉ server (Enter để dùng mặc định ws://localhost:8765): ");
+bool connectionLost = false;
+
+Console.Write("Địa chỉ server (Enter để dùng mặc định tcp://localhost:8765): ");
 string? uriInput = Console.ReadLine();
 
 Uri serverUri = string.IsNullOrWhiteSpace(uriInput)
-    ? new Uri("ws://localhost:8765")
+    ? new Uri("tcp://localhost:8765")
     : new Uri(uriInput.Trim());
 
 await using var connection = new CaroConnection();
 
 connection.MessageReceived += json => Console.WriteLine($"[nhận] {json}");
-connection.Disconnected += reason => Console.WriteLine($"[mất kết nối] {reason}");
+connection.Disconnected += reason =>
+{
+    connectionLost = true;
+    Console.WriteLine();
+    Console.WriteLine($"[MẤT KẾT NỐI] {reason}");
+    Console.WriteLine("Không thể gửi thêm message. Phiên làm việc sẽ kết thúc.");
+};
 
 try
 {
@@ -26,10 +34,15 @@ catch (Exception ex)
 
 Console.WriteLine("Nhập JSON message để gửi. Gõ /quit để thoát.");
 
-while (true)
+while (!connectionLost)
 {
     Console.Write("Gửi: ");
     string? input = Console.ReadLine();
+
+    if (connectionLost)
+    {
+        break;
+    }
 
     if (input is null || input.Trim().Equals("/quit", StringComparison.OrdinalIgnoreCase))
     {
@@ -52,4 +65,6 @@ while (true)
 }
 
 await connection.DisconnectAsync();
-Console.WriteLine("Đã đóng kết nối.");
+Console.WriteLine(connectionLost
+    ? "Phiên làm việc đã kết thúc do mất kết nối."
+    : "Đã đóng kết nối.");
