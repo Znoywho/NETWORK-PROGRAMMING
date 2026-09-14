@@ -1,21 +1,25 @@
 """
-Queue trung gian giua cac coroutine xu ly client va DB Writer.
+UDM_16 - Game Caro truc tuyen
+Module 3: Database & Queue Writer
 
-Nguyen tac: KHONG cho nhieu noi ghi truc tiep vao database cung luc.
-Moi request ghi deu di qua hang doi nay, chi mot DB Writer duy nhat
+Queue trung gian giua cac luong xu ly client va DB Writer.
+
+Nguyen tac: KHONG cho nhieu thread ghi truc tiep vao database cung luc.
+Moi request ghi deu di qua hang doi nay, chi mot thread DB Writer duy nhat
 lay ra va ghi tuan tu -> tranh race condition va tranh mat du lieu.
 
     handler client A  --\\
-    handler client B  ----> [ DBQueue ] --> DB Writer --> PostgreSQL
+    handler client B  ----> [ DBQueue ] --> Thread DB Writer --> PostgreSQL
     handler client C  --/
 
-Dung asyncio.Queue (khong phai queue.Queue) vi server chay tren mot
-event loop duy nhat: `await queue.get()` nhuong luot cho cac client
-khac khi hang doi rong, thay vi chan ca server.
+Dung queue.Queue (khong phai asyncio.Queue) vi server chay tren mo hinh
+selectors + threading dong bo, khong co event loop asyncio.
+queue.Queue da thread-safe san, khong can Lock ben ngoai.
 """
 
-import asyncio
 import logging
+import queue
+import threading
 from datetime import datetime, timezone
 from typing import Any
 
@@ -49,16 +53,17 @@ PUT_TIMEOUT = 2.0  # giay
 
 
 class DBQueue:
-    """Hang doi ghi database dung chung cho toan server."""
+    """Hang doi ghi database dung chung cho toan server (thread-safe)."""
 
     def __init__(self, maxsize: int = MAX_QUEUE_SIZE):
-        self._queue: asyncio.Queue = asyncio.Queue(maxsize=maxsize)
-        self._dropped = 0  # dem so event bi bo vi hang doi day
+        self._queue: queue.Queue = queue.Queue(maxsize=maxsize)
+        self._dropped = 0
+        self._lock = threading.Lock()  # chi de bao ve bien dem _dropped
 
     # --------------------------------------------------------
     #  Task 7: ham put() cho cac module khac goi
     # --------------------------------------------------------
-    async def put(self, op: str, data: dict[str, Any]) -> bool:
+    def put(self, op: str, data: dict[str, Any]) -> bool:
         """
         Day mot request ghi vao hang doi.
 
@@ -80,30 +85,37 @@ class DBQueue:
         try:
             # Cho toi da PUT_TIMEOUT giay. Neu DB Writer dang cham
             # va hang doi day thi bo qua con hon treo ca van dau.
-            await asyncio.wait_for(
-                self._queue.put(event), timeout=PUT_TIMEOUT
-            )
+            self._queue.put(event, timeout=PUT_TIMEOUT)
             return True
-        except asyncio.TimeoutError:
-            self._dropped += 1
+        except queue.Full:
+            with self._lock:
+                self._dropped += 1
+                tong = self._dropped
             logger.warning(
-                "Hang doi day, bo event %s (tong da bo: %d)",
-                op, self._dropped,
+                "Hang doi day, bo event %s (tong da bo: %d)", op, tong
             )
             return False
 
     # --------------------------------------------------------
     #  Danh cho DB Writer (task 8) goi
     # --------------------------------------------------------
-    async def get(self) -> dict[str, Any]:
-        """Lay mot event ra khoi hang doi. Cho neu hang doi rong."""
-        return await self._queue.get()
+    def get(self, timeout: float | None = None) -> dict[str, Any] | None:
+        """
+        Lay mot event ra khoi hang doi.
+
+        Co timeout de DB Writer con co co hoi kiem tra co dung.
+        Tra ve None neu het timeout ma hang doi van rong.
+        """
+        try:
+            return self._queue.get(timeout=timeout)
+        except queue.Empty:
+            return None
 
     def task_done(self) -> None:
         """Bao da xu ly xong event vua lay ra."""
         self._queue.task_done()
 
-    async def requeue(self, event: dict[str, Any]) -> bool:
+    def requeue(self, event: dict[str, Any]) -> bool:
         """
         Day lai event vao hang doi sau khi ghi that bai (task 9 dung).
         Tang retry_count de DB Writer biet da thu bao nhieu lan.
@@ -112,8 +124,9 @@ class DBQueue:
         try:
             self._queue.put_nowait(event)
             return True
-        except asyncio.QueueFull:
-            self._dropped += 1
+        except queue.Full:
+            with self._lock:
+                self._dropped += 1
             logger.error(
                 "Khong the requeue event %s, hang doi day", event["op"]
             )
@@ -126,22 +139,23 @@ class DBQueue:
         return self._queue.qsize()
 
     def dropped(self) -> int:
-        return self._dropped
+        with self._lock:
+            return self._dropped
 
     def is_empty(self) -> bool:
         return self._queue.empty()
 
-    async def join(self) -> None:
+    def join(self) -> None:
         """Cho toan bo event trong hang doi duoc xu ly xong."""
-        await self._queue.join()
+        self._queue.join()
 
 
 # ------------------------------------------------------------
 #  Instance dung chung. Cac module khac import cai nay.
 #
-#  Vi du trong handlers/message.py:
+#  Vi du trong handlers/message_handlers.py:
 #      from app.queue.db_queue import db_queue, Op
-#      await db_queue.put(Op.INSERT_MOVE, {
+#      db_queue.put(Op.INSERT_MOVE, {
 #          "match_id": room_id,
 #          "player_id": player_id,
 #          "row_idx": row,
