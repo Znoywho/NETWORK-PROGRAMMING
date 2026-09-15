@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/Code/" />
+  <Folder Name="/Code/Client/">
+    <Project Path="Code/Client/Caroclient.UI/Caroclient.UI.csproj" />
+  </Folder>
+</Solution>

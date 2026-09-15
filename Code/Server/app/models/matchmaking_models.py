@@ -1,7 +1,7 @@
 import time
 from dataclasses import dataclass, field
-from typing import Dict, Optional
-import time
+from enum import Enum
+
 from app.game.caro import Caro
 
 
@@ -46,4 +46,9 @@ class Room:
         return None
 
     def to_dict(self):
-        return {"room_id": self.room_id, "player_x": self.player_x, "player_o": self.player_o, "status": self.status}
+        return {
+                "room_id": self.room_id, 
+                "player_x": self.player_x, 
+                "player_o": self.player_o, 
+                "status": self.status.value
+            }
