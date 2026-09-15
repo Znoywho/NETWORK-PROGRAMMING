@@ -40,6 +40,8 @@ class Caro:
         self.last_move = []
         self.turn = 1
         self.XO = self.originXO
+        self.current_turn = self.player_X if self.originXO == "X" else self.player_O
+        self.status = "playing"
 
     def _visualize_grid(self):
         for i in range(self.rows):
@@ -56,6 +58,30 @@ class Caro:
  
     def set_cell(self, row: int, col: int, value: str):
         self.grid[row][col] = value
+
+    def validate_move(self, row: int, col: int, player: str) -> bool:
+        """
+        Kiểm tra 1 nước đi có hợp lệ hay không:
+        - Ván đấu phải đang diễn ra (chưa 'finished')
+        - Toạ độ (row, col) phải nằm trong bàn cờ
+        - Ô (row, col) phải đang trống
+        - Phải đúng lượt của 'player' (player phải khớp self.current_turn)
+ 
+        Trả về True nếu nước đi hợp lệ, False nếu không.
+        """
+        if self.status == "finished":
+            return False
+ 
+        if not self.is_in_bounds(row, col):
+            return False
+ 
+        if not self.is_empty(row, col):
+            return False
+ 
+        if player != self.current_turn:
+            return False
+ 
+        return True
 
     def _make_move(self, X: int, Y: int):
         if self.grid[X][Y] != ".":
