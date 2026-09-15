@@ -2,7 +2,9 @@ import os
 
 from dotenv import load_dotenv
 
-# ===CHECK USING DOCKER===
+load_dotenv()
+
+# === CHECK USING DOCKER ===
 IS_DOCKER = os.getenv("RUNNING_IN_DOCKER", "false").lower() == "true"
 
 if IS_DOCKER:
@@ -12,8 +14,7 @@ else:
 
 
 class Config:
-    load_dotenv()
-    DATABASE_URI = str(DATABASE_URL)
+    DATABASE_URI = DATABASE_URL
 
 
 print(Config.DATABASE_URI)
