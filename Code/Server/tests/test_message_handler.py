@@ -185,6 +185,42 @@ class MessageHandlerTest(unittest.TestCase):
         self.assertEqual("FORBIDDEN", result[0]["payload"]["code"])
         self.assertEqual(".", room.board_instance.grid[0][0])
 
+    def test_spectator_joins_room_and_receives_game_state(self):
+        handler = self._handler()
+        self._login_both(handler)
+
+        spectator_id = "00000000-0000-0000-0000-000000000003"
+        spectator_socket = object()
+        self.player_manager.add_player(
+            spectator_id,
+            "spectator",
+            spectator_socket,
+        )
+
+        room = self.room_manager.create_room(self.alice_id, self.bob_id)
+        room.board_instance = Caro(3, 3, winning_condition=3)
+        room.status = RoomStatus.PLAYING
+
+        result = handler.handle(
+            {
+                "type": "spectate",
+                "room_id": room.room_id,
+            },
+            spectator_socket,
+        )
+
+        self.assertEqual("game_state", result[0]["payload"]["type"])
+        self.assertEqual(room.room_id, result[0]["payload"]["room_id"])
+        self.assertEqual("playing", result[0]["payload"]["status"])
+        self.assertEqual(3, len(result[0]["payload"]["board"]))
+        self.assertEqual(3, len(result[0]["payload"]["board"][0]))
+
+        self.assertIn(spectator_id, room.spectators)
+
+        spectator = self.player_manager.get_player(spectator_id)
+        self.assertEqual(PlayerStatus.SPECTATING, spectator.status)
+        self.assertEqual(room.room_id, spectator.current_room_id)
+
     def test_server_delivery_routes_origin_targeted_and_broadcast_messages(self):
         server = ServerHandler("127.0.0.1", 0)
         origin = FakeSocket()
