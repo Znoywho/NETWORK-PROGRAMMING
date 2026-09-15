@@ -46,6 +46,7 @@ class FakeUser:
         self.username = username
         self.password_hash = hash_password(password)
         self.last_login_at = None
+        self.ranking = 1000
 
 
 class FakeSocket:
@@ -135,6 +136,71 @@ class MessageHandlerTest(unittest.TestCase):
         self.assertEqual(RoomStatus.FINISHED, self.room_manager.get_room(room_id).status)
         self.assertEqual(PlayerStatus.IDLE, self.player_manager.get_player(self.alice_id).status)
         self.assertEqual(PlayerStatus.IDLE, self.player_manager.get_player(self.bob_id).status)
+
+    def test_full_match_flow_login_invite_accept_move_and_finish(self):
+        handler = self._handler(board_factory=lambda: Caro(1, 1, winning_condition=1))
+
+        # Login
+        self._login_both(handler)
+        self.assertIsNotNone(self.player_manager.get_player(self.alice_id))
+        self.assertIsNotNone(self.player_manager.get_player(self.bob_id))
+
+        # Invite
+        invite_result = handler.handle(
+            {
+                "type": "invite",
+                "inviteId": "alice-invites-bob",
+                "toPlayerId": self.bob_id,
+            },
+            self.alice_socket,
+        )
+        invite_id = invite_result[0]["payload"]["inviteId"]
+
+        # Accept invite
+        accepted = handler.handle(
+            {
+                "type": "accept_invite",
+                "inviteId": invite_id,
+            },
+            self.bob_socket,
+        )
+        room_id = accepted[0]["payload"]["room_id"]
+        room = self.room_manager.get_room(room_id)
+
+        self.assertEqual(RoomStatus.PLAYING, room.status)
+        self.assertEqual(self.alice_id, accepted[0]["payload"]["currentPlayerId"])
+
+        # Alice makes the winning move
+        result = handler.handle(
+            {
+                "type": "make_move",
+                "room_id": room_id,
+                "playerId": self.alice_id,
+                "row": 0,
+                "col": 0,
+            },
+            self.alice_socket,
+        )
+
+        # Game finishes
+        result_payloads = [
+            delivery["payload"]
+            for delivery in result
+            if delivery["payload"]["type"] == "game_result"
+        ]
+
+        self.assertEqual({"win", "lose"}, {
+            payload["result"] for payload in result_payloads
+        })
+        self.assertEqual(RoomStatus.FINISHED, room.status)
+        self.assertEqual(
+            PlayerStatus.IDLE,
+            self.player_manager.get_player(self.alice_id).status,
+        )
+        self.assertEqual(
+            PlayerStatus.IDLE,
+            self.player_manager.get_player(self.bob_id).status,
+        )
 
     def test_move_cannot_impersonate_another_player(self):
         handler = self._handler()
