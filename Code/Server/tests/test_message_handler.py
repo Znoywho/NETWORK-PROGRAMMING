@@ -6,13 +6,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
 
-from game.caro import Caro
-from handlers.message import MessageHandler, hash_password
-from matchmaking.invite_manager import InviteManager
-from matchmaking.player_manager import PlayerManager
-from matchmaking.room_manager import RoomManager
-from models.matchmaking_models import PlayerStatus, RoomStatus
-from network.server import ServerHandler
+from app.game.caro import Caro
+from app.handlers.message_handlers import MessageHandler, hash_password
+from app.matchmaking.invite_manager import InviteManager
+from app.matchmaking.player_manager import PlayerManager
+from app.matchmaking.room_manager import RoomManager
+from app.models.matchmaking_models import PlayerStatus, RoomStatus
 
 
 class FakeQuery:
@@ -47,6 +46,7 @@ class FakeUser:
         self.username = username
         self.password_hash = hash_password(password)
         self.last_login_at = None
+        self.ranking = 1000
 
 
 class FakeSocket:
@@ -137,6 +137,71 @@ class MessageHandlerTest(unittest.TestCase):
         self.assertEqual(PlayerStatus.IDLE, self.player_manager.get_player(self.alice_id).status)
         self.assertEqual(PlayerStatus.IDLE, self.player_manager.get_player(self.bob_id).status)
 
+    def test_full_match_flow_login_invite_accept_move_and_finish(self):
+        handler = self._handler(board_factory=lambda: Caro(1, 1, winning_condition=1))
+
+        # Login
+        self._login_both(handler)
+        self.assertIsNotNone(self.player_manager.get_player(self.alice_id))
+        self.assertIsNotNone(self.player_manager.get_player(self.bob_id))
+
+        # Invite
+        invite_result = handler.handle(
+            {
+                "type": "invite",
+                "inviteId": "alice-invites-bob",
+                "toPlayerId": self.bob_id,
+            },
+            self.alice_socket,
+        )
+        invite_id = invite_result[0]["payload"]["inviteId"]
+
+        # Accept invite
+        accepted = handler.handle(
+            {
+                "type": "accept_invite",
+                "inviteId": invite_id,
+            },
+            self.bob_socket,
+        )
+        room_id = accepted[0]["payload"]["room_id"]
+        room = self.room_manager.get_room(room_id)
+
+        self.assertEqual(RoomStatus.PLAYING, room.status)
+        self.assertEqual(self.alice_id, accepted[0]["payload"]["currentPlayerId"])
+
+        # Alice makes the winning move
+        result = handler.handle(
+            {
+                "type": "make_move",
+                "room_id": room_id,
+                "playerId": self.alice_id,
+                "row": 0,
+                "col": 0,
+            },
+            self.alice_socket,
+        )
+
+        # Game finishes
+        result_payloads = [
+            delivery["payload"]
+            for delivery in result
+            if delivery["payload"]["type"] == "game_result"
+        ]
+
+        self.assertEqual({"win", "lose"}, {
+            payload["result"] for payload in result_payloads
+        })
+        self.assertEqual(RoomStatus.FINISHED, room.status)
+        self.assertEqual(
+            PlayerStatus.IDLE,
+            self.player_manager.get_player(self.alice_id).status,
+        )
+        self.assertEqual(
+            PlayerStatus.IDLE,
+            self.player_manager.get_player(self.bob_id).status,
+        )
+
     def test_move_cannot_impersonate_another_player(self):
         handler = self._handler()
         self._login_both(handler)
@@ -151,6 +216,76 @@ class MessageHandlerTest(unittest.TestCase):
 
         self.assertEqual("FORBIDDEN", result[0]["payload"]["code"])
         self.assertEqual(".", room.board_instance.grid[0][0])
+
+    def test_spectator_cannot_make_move(self):
+        handler = self._handler()
+        self._login_both(handler)
+
+        spectator_id = "00000000-0000-0000-0000-000000000003"
+        spectator_socket = object()
+        self.player_manager.add_player(
+            spectator_id,
+            "spectator",
+            spectator_socket,
+        )
+
+        room = self.room_manager.create_room(self.alice_id, self.bob_id)
+        room.board_instance = Caro(3, 3, winning_condition=3)
+        room.status = RoomStatus.PLAYING
+
+        self.room_manager.add_spectator(room.room_id, spectator_id)
+        self.player_manager.set_status(spectator_id, PlayerStatus.SPECTATING)
+        self.player_manager.set_current_room(spectator_id, room.room_id)
+
+        result = handler.handle(
+            {
+                "type": "make_move",
+                "room_id": room.room_id,
+                "playerId": spectator_id,
+                "row": 0,
+                "col": 0,
+            },
+            spectator_socket,
+        )
+
+        self.assertEqual("FORBIDDEN", result[0]["payload"]["code"])
+        self.assertEqual(".", room.board_instance.grid[0][0])
+
+    def test_spectator_joins_room_and_receives_game_state(self):
+        handler = self._handler()
+        self._login_both(handler)
+
+        spectator_id = "00000000-0000-0000-0000-000000000003"
+        spectator_socket = object()
+        self.player_manager.add_player(
+            spectator_id,
+            "spectator",
+            spectator_socket,
+        )
+
+        room = self.room_manager.create_room(self.alice_id, self.bob_id)
+        room.board_instance = Caro(3, 3, winning_condition=3)
+        room.status = RoomStatus.PLAYING
+
+        result = handler.handle(
+            {
+                "type": "spectate",
+                "room_id": room.room_id,
+            },
+            spectator_socket,
+        )
+
+        self.assertEqual("game_state", result[0]["payload"]["type"])
+        self.assertEqual(room.room_id, result[0]["payload"]["room_id"])
+        self.assertEqual("playing", result[0]["payload"]["status"])
+        self.assertEqual(3, len(result[0]["payload"]["board"]))
+        self.assertEqual(3, len(result[0]["payload"]["board"][0]))
+
+        self.assertIn(spectator_id, room.spectators)
+
+        spectator = self.player_manager.get_player(spectator_id)
+        self.assertEqual(PlayerStatus.SPECTATING, spectator.status)
+        self.assertEqual(room.room_id, spectator.current_room_id)
 
     def test_server_delivery_routes_origin_targeted_and_broadcast_messages(self):
         server = ServerHandler("127.0.0.1", 0)

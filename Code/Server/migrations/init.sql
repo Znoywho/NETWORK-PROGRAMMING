@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
     id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     username        VARCHAR(32)  NOT NULL UNIQUE,
     password_hash   VARCHAR(255),
+    ranking INT DEFAULT 0, 
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     last_login_at   TIMESTAMPTZ,
 

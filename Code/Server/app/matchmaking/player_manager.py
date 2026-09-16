@@ -1,4 +1,5 @@
 import threading
+from typing import Optional
 
 from app.models.matchmaking_models import Player, PlayerStatus
 
@@ -38,6 +39,13 @@ class PlayerManager:
             player.current_room_id = room_id
             return True
 
+    def get_player_by_connection(self, connection) -> Optional[Player]:
+        with self._lock:
+            for player in self._players.values():
+                if player.connection == connection:
+                    return player
+            return None
+
     def list_online(self) -> list[dict]:
         with self._lock:
             return [
@@ -48,3 +56,14 @@ class PlayerManager:
     def is_online(self, player_id: str) -> bool:
         with self._lock:
             return player_id in self._players
+
+
+    def find_player_by_socket(self, connection):
+        with self._lock:
+            # Do not call the other locking helpers here: ``Lock`` is not
+            # re-entrant, so doing so would deadlock the server's selector
+            # loop as soon as it handles a login request.
+            for player in self._players.values():
+                if player.connection is connection:
+                    return player.player_id
+            return None

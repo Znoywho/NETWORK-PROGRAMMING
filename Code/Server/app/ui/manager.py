@@ -42,83 +42,35 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Optional
 
 import pygame
 
 # ----------------------------------------------------------------------------
 # Cấu hình giao diện
 # ----------------------------------------------------------------------------
-WIDTH, HEIGHT = 1200, 720
-SIDEBAR_W = 300
-FPS = 30
-
-COL_BG =(50, 94, 106)
-COL_PANEL = (32, 35, 44)
-COL_PANEL_ALT = (38, 42, 52)
-COL_BORDER = (55, 59, 70)
-COL_TEXT = (230, 230, 235)
-COL_TEXT_DIM = (150, 154, 165)
-COL_ACCENT = (86, 156, 255)
-COL_GREEN = (95, 200, 130)
-COL_YELLOW = (230, 190, 90)
-COL_RED = (230, 100, 100)
-COL_SELECTED = (52, 58, 74)
-COL_GRID = (70, 74, 86)
-COL_X = (240, 120, 120)
-COL_O = (110, 170, 240)
-
-STATUS_COLOR = {
-    "idle": COL_TEXT_DIM,
-    "playing": COL_GREEN,
-    "spectating": COL_YELLOW,
-    "waiting": COL_YELLOW,
-    "finished": COL_TEXT_DIM,
-}
-
-
-# ----------------------------------------------------------------------------
-# Đọc dữ liệu an toàn từ manager (dùng chung lock của chính manager đó)
-# ----------------------------------------------------------------------------
-def _snapshot_players(player_manager) -> list:
-    with player_manager._lock:
-        return list(player_manager._players.values())
-
-
-def _snapshot_rooms(room_manager) -> list:
-    with room_manager._lock:
-        return list(room_manager._rooms.values())
-
-
-def _enum_val(x):
-    """Room.status / Player.status có thể là Enum hoặc string, chuẩn hoá về string."""
-    return getattr(x, "value", x)
-
-
-# ----------------------------------------------------------------------------
-# UI helpers
-# ----------------------------------------------------------------------------
-class Button:
-    """Vùng bấm được, lưu callback để gọi khi click."""
-
-    def __init__(self, rect, on_click, data=None):
-        self.rect = pygame.Rect(rect)
-        self.on_click = on_click
-        self.data = data
-
-    def hit(self, pos):
-        return self.rect.collidepoint(pos)
-
-
-def draw_text(surf, font, text, pos, color=COL_TEXT, max_w=None):
-    if max_w is not None:
-        while font.size(text)[0] > max_w and len(text) > 1:
-            text = text[:-1]
-        if font.size(text)[0] > max_w:
-            text = text[: max(0, len(text) - 3)] + "..."
-    img = font.render(text, True, color)
-    surf.blit(img, pos)
-    return img.get_width()
+from app.ui.style import (
+    COL_ACCENT,
+    COL_BG,
+    COL_BORDER,
+    COL_GRID,
+    COL_O,
+    COL_PANEL,
+    COL_PANEL_ALT,
+    COL_SELECTED,
+    COL_TEXT,
+    COL_TEXT_DIM,
+    COL_X,
+    FPS,
+    HEIGHT,
+    SIDEBAR_W,
+    STATUS_COLOR,
+    WIDTH,
+    Button,
+    _enum_val,
+    _snapshot_players,
+    _snapshot_rooms,
+    draw_text,
+)
 
 
 # ----------------------------------------------------------------------------
@@ -134,13 +86,13 @@ class ServerDashboard:
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
         self.clock = pygame.time.Clock()
 
-        self.font =             pygame.font.Font("app/assests/font/MinecraftDefault-Regular.ttf", 16)
-        self.font_bold =        pygame.font.Font("app/assests/font/MinecraftDefault-Bold.ttf", 18)
-        self.font_small =       pygame.font.Font("app/assests/font/MinecraftDefault-Regular.ttf", 13)
-        self.font_title =       pygame.font.Font("app/assests/font/MinecraftDefault-Regular.ttf", 24)
+        self.font = pygame.font.Font("app/assests/font/MinecraftDefault-Regular.ttf", 16)
+        self.font_bold = pygame.font.Font("app/assests/font/MinecraftDefault-Bold.ttf", 18)
+        self.font_small = pygame.font.Font("app/assests/font/MinecraftDefault-Regular.ttf", 13)
+        self.font_title = pygame.font.Font("app/assests/font/MinecraftDefault-Regular.ttf", 24)
 
         self.tab = "rooms"  # "rooms" | "players"
-        self.selected_room_id: Optional[str] = None
+        self.selected_room_id: str | None = None
         self.scroll = 0
 
         self.running = True
@@ -159,9 +111,7 @@ class ServerDashboard:
             if event.type == pygame.QUIT:
                 self.running = False
             elif event.type == pygame.VIDEORESIZE:
-                self.screen = pygame.display.set_mode(
-                    (event.w, event.h), pygame.RESIZABLE
-                )
+                self.screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
             elif event.type == pygame.MOUSEWHEEL:
                 self.scroll = max(0, self.scroll - event.y * 20)
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -208,18 +158,12 @@ class ServerDashboard:
             self.tab = name
             self.scroll = 0
 
-        for rect, name, label in (
-            (rooms_rect, "rooms", "Ban co"),
-            (players_rect, "players", "Client"),
-        ):
+        for rect, name, label in ((rooms_rect, "rooms", "Ban co"), (players_rect, "players", "Client")):
             active = self.tab == name
             pygame.draw.rect(self.screen, COL_SELECTED if active else COL_PANEL, rect)
             color = COL_ACCENT if active else COL_TEXT_DIM
             tw = self.font_bold.size(label)[0]
-            draw_text(
-                self.screen, self.font_bold, label,
-                (rect[0] + (rect[2] - tw) // 2, rect[1] + 10), color,
-            )
+            draw_text(self.screen, self.font_bold, label, (rect[0] + (rect[2] - tw) // 2, rect[1] + 10), color)
             self._buttons.append(Button(rect, lambda _n, n=name: set_tab(n)))
         pygame.draw.line(self.screen, COL_BORDER, (x, y + tab_h), (x + w, y + tab_h))
 
@@ -253,8 +197,7 @@ class ServerDashboard:
 
         status = _enum_val(room.status)
         draw_text(
-            self.screen, self.font_small, status.upper(),
-            (x + w - 90, y + 10), STATUS_COLOR.get(status, COL_TEXT_DIM),
+            self.screen, self.font_small, status.upper(), (x + w - 90, y + 10), STATUS_COLOR.get(status, COL_TEXT_DIM)
         )
 
         vs = f"X: {room.player_x}   O: {room.player_o}"
@@ -287,7 +230,9 @@ class ServerDashboard:
         pygame.draw.rect(self.screen, COL_PANEL, rect)
         pygame.draw.line(self.screen, COL_BORDER, (x, y + row_h), (x + w, y + row_h))
 
-        draw_text(self.screen, self.font_bold, player.username or player.player_id, (x + 14, y + 6), COL_TEXT, max_w=w - 30)
+        draw_text(
+            self.screen, self.font_bold, player.username or player.player_id, (x + 14, y + 6), COL_TEXT, max_w=w - 30
+        )
 
         status = _enum_val(player.status)
         pygame.draw.circle(self.screen, STATUS_COLOR.get(status, COL_TEXT_DIM), (x + 20, y + 34), 5)
@@ -298,9 +243,7 @@ class ServerDashboard:
 
         # click vào 1 player -> nếu đang trong phòng, nhảy qua tab Rooms và chọn phòng đó
         if player.current_room_id:
-            self._buttons.append(
-                Button(rect, self._jump_to_room, data=player.current_room_id)
-            )
+            self._buttons.append(Button(rect, self._jump_to_room, data=player.current_room_id))
 
     def _jump_to_room(self, room_id):
         self.tab = "rooms"
@@ -326,13 +269,14 @@ class ServerDashboard:
         draw_text(self.screen, self.font_bold, f"Phong #{room.room_id}", (x + pad, y + pad), COL_TEXT)
         status = _enum_val(room.status)
         draw_text(
-            self.screen, self.font, status.upper(),
-            (x + pad, y + pad + 28), STATUS_COLOR.get(status, COL_TEXT_DIM),
+            self.screen, self.font, status.upper(), (x + pad, y + pad + 28), STATUS_COLOR.get(status, COL_TEXT_DIM)
         )
         draw_text(
-            self.screen, self.font,
+            self.screen,
+            self.font,
             f"X = {room.player_x}      O = {room.player_o}      Khan gia: {len(room.spectators)}",
-            (x + pad + 110, y + pad + 28), COL_TEXT_DIM,
+            (x + pad + 110, y + pad + 28),
+            COL_TEXT_DIM,
         )
 
         board_top = y + pad + 64
@@ -366,15 +310,22 @@ class ServerDashboard:
                 cy = oy + r * cell + cell // 2
                 margin = max(4, cell // 6)
                 if last == (r, c):
-                    pygame.draw.rect(
-                        self.screen, COL_SELECTED,
-                        (ox + c * cell, oy + r * cell, cell, cell),
-                    )
+                    pygame.draw.rect(self.screen, COL_SELECTED, (ox + c * cell, oy + r * cell, cell, cell))
                 if v == "X":
-                    pygame.draw.line(self.screen, COL_X, (ox + c * cell + margin, oy + r * cell + margin),
-                                      (ox + (c + 1) * cell - margin, oy + (r + 1) * cell - margin), 3)
-                    pygame.draw.line(self.screen, COL_X, (ox + (c + 1) * cell - margin, oy + r * cell + margin),
-                                      (ox + c * cell + margin, oy + (r + 1) * cell - margin), 3)
+                    pygame.draw.line(
+                        self.screen,
+                        COL_X,
+                        (ox + c * cell + margin, oy + r * cell + margin),
+                        (ox + (c + 1) * cell - margin, oy + (r + 1) * cell - margin),
+                        3,
+                    )
+                    pygame.draw.line(
+                        self.screen,
+                        COL_X,
+                        (ox + (c + 1) * cell - margin, oy + r * cell + margin),
+                        (ox + c * cell + margin, oy + (r + 1) * cell - margin),
+                        3,
+                    )
                 else:
                     pygame.draw.circle(self.screen, COL_O, (cx, cy), cell // 2 - margin, 3)
 
@@ -388,6 +339,7 @@ def run_dashboard(player_manager, room_manager):
 # ----------------------------------------------------------------------------
 if __name__ == "__main__":
     import sys
+
     sys.path.insert(0, ".")
 
     # Fake Caro board (giống class Caro bạn đưa, thu gọn) để demo hiển thị
@@ -423,7 +375,7 @@ if __name__ == "__main__":
         username: str
         connection: object = None
         status: PlayerStatus = PlayerStatus.IDLE
-        current_room_id: Optional[str] = None
+        current_room_id: str | None = None
         connected_at: float = field(default_factory=time.time)
 
     @dataclass
@@ -432,7 +384,7 @@ if __name__ == "__main__":
         player_x: str
         player_o: str
         status: RoomStatus = RoomStatus.WAITING
-        board_instance: Optional[FakeCaro] = None
+        board_instance: FakeCaro | None = None
         spectators: set = field(default_factory=set)
         created_at: float = field(default_factory=time.time)
 
@@ -456,8 +408,7 @@ if __name__ == "__main__":
         for i, name in enumerate(names):
             pid = f"p{i}"
             mgr_players._players[pid] = FakePlayer(
-                player_id=pid, username=name,
-                status=random.choice(list(PlayerStatus)),
+                player_id=pid, username=name, status=random.choice(list(PlayerStatus))
             )
 
         pids = list(mgr_players._players.keys())
@@ -468,8 +419,7 @@ if __name__ == "__main__":
             for _ in range(random.randint(0, 15)):
                 board.random_move()
             mgr_rooms._rooms[rid] = FakeRoom(
-                room_id=rid, player_x=px, player_o=po,
-                status=RoomStatus.PLAYING, board_instance=board,
+                room_id=rid, player_x=px, player_o=po, status=RoomStatus.PLAYING, board_instance=board
             )
             mgr_players._players[px].status = PlayerStatus.PLAYING
             mgr_players._players[px].current_room_id = rid
