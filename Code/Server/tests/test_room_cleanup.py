@@ -4,7 +4,7 @@ from app.models.matchmaking_models import RoomStatus
 
 def test_cleanup_when_finished_and_no_spectators():
     rm = RoomManager()
-    room = rm.create_room("alice", "bob")
+    room = rm.create_room("alice", "bob", "1")
 
     assert rm.cleanup_if_done(room.room_id) is False
     assert rm.get_room(room.room_id) is not None
@@ -30,7 +30,7 @@ def test_cleanup_ignores_nonexistent_room():
 
 def test_mark_player_left():
     rm = RoomManager()
-    room = rm.create_room("alice", "bob")
+    room = rm.create_room("alice", "bob", "1")
     rm.mark_player_left(room.room_id, "alice")
 
     updated_room = rm.get_room(room.room_id)

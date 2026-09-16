@@ -35,14 +35,14 @@ class InviteManager:
             invite = self._pending_invites.get(invite_id)
             return dict(invite) if invite else None
 
-    def accept_invite(self, invite_id: str, board_factory: Callable) -> dict:
+    def accept_invite(self, invite_id: str, board_factory: Callable, room_id: str) -> dict:
         with self._lock:
             invite = self._pending_invites.pop(invite_id, None)
 
         if not invite:
             return {"success": False, "reason": "invite_not_found_or_expired"}
 
-        room = self.room_manager.create_room(invite["from"], invite["to"])
+        room = self.room_manager.create_room(invite["from"], invite["to"], room_id)
         room.board_instance = board_factory()
 
         self.player_manager.set_status(invite["from"], PlayerStatus.PLAYING)

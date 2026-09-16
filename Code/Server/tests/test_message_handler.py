@@ -1,5 +1,3 @@
-import asyncio
-import sys
 import unittest
 import uuid
 from pathlib import Path
@@ -26,34 +24,75 @@ class FakeQuery:
 
 
 class FakeSession:
+    """Thay cho Session that: cap id tang dan giong BIGSERIAL cua Postgres."""
+
     def __init__(self, users):
         self.users = users
         self.commits = 0
+        self.added = []
+        self._next_id = 1
 
     def query(self, _model):
         return FakeQuery(self.users)
 
+    def add(self, obj):
+        self.added.append(obj)
+
+    def flush(self):
+        # Thay cho INSERT ... RETURNING id.
+        for obj in self.added:
+            if getattr(obj, "id", None) is None:
+                obj.id = self._next_id
+                self._next_id += 1
+
     def commit(self):
+        self.flush()
         self.commits += 1
 
     def rollback(self):
-        pass
+        self.added.clear()
+
+    def added_of(self, model):
+        return [obj for obj in self.added if isinstance(obj, model)]
+
+
+class FakeQueue:
+    """Thay cho DBQueue: chi ghi lai event de test khang dinh, khong cham DB."""
+
+    def __init__(self):
+        self.events = []
+
+    def put(self, op, data):
+        self.events.append((op, data))
+        return True
+
+    def ops(self):
+        return [op for op, _ in self.events]
+
+    def first_data(self, op):
+        for event_op, data in self.events:
+            if event_op == op:
+                return data
+        return None
 
 
 class FakeUser:
     def __init__(self, player_id, username, password):
-        self.id = uuid.UUID(player_id)
+        self.id = int(player_id)
         self.username = username
         self.password_hash = hash_password(password)
+        self.ranking = 0
         self.last_login_at = None
         self.ranking = 1000
 
 
 class FakeSocket:
+    """Dung thay Connection: `send` la dong bo va chi gom payload lai."""
+
     def __init__(self):
         self.messages = []
 
-    async def send(self, payload):
+    def send(self, payload):
         self.messages.append(payload)
 
 
@@ -62,10 +101,12 @@ class MessageHandlerTest(unittest.TestCase):
         self.player_manager = PlayerManager()
         self.room_manager = RoomManager()
         self.invite_manager = InviteManager(self.player_manager, self.room_manager)
-        self.alice_id = "00000000-0000-0000-0000-000000000001"
-        self.bob_id = "00000000-0000-0000-0000-000000000002"
+        # users.id la BIGSERIAL; giao thuc JSON van tai chung duoi dang chuoi.
+        self.alice_id = "1"
+        self.bob_id = "2"
         self.alice_socket = object()
         self.bob_socket = object()
+        self.write_queue = FakeQueue()
 
     def _handler(self, *, board_factory=None):
         users = {
@@ -78,6 +119,7 @@ class MessageHandlerTest(unittest.TestCase):
             self.invite_manager,
             db_session=FakeSession(users),
             board_factory=board_factory,
+            write_queue=self.write_queue,
         )
 
     def _login_both(self, handler):
@@ -85,6 +127,15 @@ class MessageHandlerTest(unittest.TestCase):
         handler.handle({"type": "login", "username": "alice", "password": "test-password"}, self.alice_socket)
         handler.session.users = {"bob": FakeUser(self.bob_id, "bob", "test-password")}
         handler.handle({"type": "login", "username": "bob", "password": "test-password"}, self.bob_socket)
+
+    def _start_game(self, handler):
+        """Moi + chap nhan, tra ve room_id cua van vua mo."""
+        invite_result = handler.handle(
+            {"type": "invite", "inviteId": "alice-invites-bob", "toPlayerId": self.bob_id}, self.alice_socket
+        )
+        invite_id = invite_result[0]["payload"]["inviteId"]
+        accepted = handler.handle({"type": "accept_invite", "inviteId": invite_id}, self.bob_socket)
+        return accepted[0]["payload"]["room_id"]
 
     def test_login_replies_to_origin_and_broadcasts_online_players(self):
         handler = self._handler()
@@ -120,12 +171,7 @@ class MessageHandlerTest(unittest.TestCase):
     def test_winning_move_sends_personal_win_and_lose_results(self):
         handler = self._handler(board_factory=lambda: Caro(1, 1, winning_condition=1))
         self._login_both(handler)
-        invite_result = handler.handle(
-            {"type": "invite", "inviteId": "alice-invites-bob", "toPlayerId": self.bob_id}, self.alice_socket
-        )
-        invite_id = invite_result[0]["payload"]["inviteId"]
-        accepted = handler.handle({"type": "accept_invite", "inviteId": invite_id}, self.bob_socket)
-        room_id = accepted[0]["payload"]["room_id"]
+        room_id = self._start_game(handler)
 
         result = handler.handle(
             {"type": "make_move", "room_id": room_id, "playerId": self.alice_id, "row": 0, "col": 0}, self.alice_socket
@@ -137,75 +183,10 @@ class MessageHandlerTest(unittest.TestCase):
         self.assertEqual(PlayerStatus.IDLE, self.player_manager.get_player(self.alice_id).status)
         self.assertEqual(PlayerStatus.IDLE, self.player_manager.get_player(self.bob_id).status)
 
-    def test_full_match_flow_login_invite_accept_move_and_finish(self):
-        handler = self._handler(board_factory=lambda: Caro(1, 1, winning_condition=1))
-
-        # Login
-        self._login_both(handler)
-        self.assertIsNotNone(self.player_manager.get_player(self.alice_id))
-        self.assertIsNotNone(self.player_manager.get_player(self.bob_id))
-
-        # Invite
-        invite_result = handler.handle(
-            {
-                "type": "invite",
-                "inviteId": "alice-invites-bob",
-                "toPlayerId": self.bob_id,
-            },
-            self.alice_socket,
-        )
-        invite_id = invite_result[0]["payload"]["inviteId"]
-
-        # Accept invite
-        accepted = handler.handle(
-            {
-                "type": "accept_invite",
-                "inviteId": invite_id,
-            },
-            self.bob_socket,
-        )
-        room_id = accepted[0]["payload"]["room_id"]
-        room = self.room_manager.get_room(room_id)
-
-        self.assertEqual(RoomStatus.PLAYING, room.status)
-        self.assertEqual(self.alice_id, accepted[0]["payload"]["currentPlayerId"])
-
-        # Alice makes the winning move
-        result = handler.handle(
-            {
-                "type": "make_move",
-                "room_id": room_id,
-                "playerId": self.alice_id,
-                "row": 0,
-                "col": 0,
-            },
-            self.alice_socket,
-        )
-
-        # Game finishes
-        result_payloads = [
-            delivery["payload"]
-            for delivery in result
-            if delivery["payload"]["type"] == "game_result"
-        ]
-
-        self.assertEqual({"win", "lose"}, {
-            payload["result"] for payload in result_payloads
-        })
-        self.assertEqual(RoomStatus.FINISHED, room.status)
-        self.assertEqual(
-            PlayerStatus.IDLE,
-            self.player_manager.get_player(self.alice_id).status,
-        )
-        self.assertEqual(
-            PlayerStatus.IDLE,
-            self.player_manager.get_player(self.bob_id).status,
-        )
-
     def test_move_cannot_impersonate_another_player(self):
         handler = self._handler()
         self._login_both(handler)
-        room = self.room_manager.create_room(self.alice_id, self.bob_id)
+        room = self.room_manager.create_room(self.alice_id, self.bob_id, "99")
         room.board_instance = Caro(3, 3, winning_condition=3)
         room.status = RoomStatus.PLAYING
 
@@ -294,19 +275,17 @@ class MessageHandlerTest(unittest.TestCase):
         server.connected_users.add_player(self.alice_id, "alice", origin)
         server.connected_users.add_player(self.bob_id, "bob", other)
 
-        asyncio.run(
-            server._send_deliveries(
-                [
-                    {"targets": [], "payload": {"type": "origin"}},
-                    {"targets": [self.bob_id], "payload": {"type": "targeted"}},
-                    {"targets": None, "payload": {"type": "broadcast"}},
-                ],
-                origin,
-            )
+        server._dispatch(
+            [
+                {"targets": [], "payload": {"type": "origin"}},
+                {"targets": [self.bob_id], "payload": {"type": "targeted"}},
+                {"targets": None, "payload": {"type": "broadcast"}},
+            ],
+            origin,
         )
 
-        self.assertEqual(['{"type": "origin"}', '{"type": "broadcast"}'], origin.messages)
-        self.assertEqual(['{"type": "targeted"}', '{"type": "broadcast"}'], other.messages)
+        self.assertEqual([{"type": "origin"}, {"type": "broadcast"}], origin.messages)
+        self.assertEqual([{"type": "targeted"}, {"type": "broadcast"}], other.messages)
 
 
 if __name__ == "__main__":

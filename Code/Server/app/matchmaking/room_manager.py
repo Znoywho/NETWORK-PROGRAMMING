@@ -1,18 +1,16 @@
 import threading
-import uuid
 
-from app.models.matchmaking_models import Room
-
-from app.models.matchmaking_models import Room, RoomStatus 
+from app.models.matchmaking_models import Room, RoomStatus
 
 class RoomManager:
     def __init__(self):
         self._rooms: dict[str, Room] = {}
         self._lock = threading.Lock()
 
-    def create_room(self, player_x_id: str, player_o_id: str) -> Room:
+    def create_room(self, player_x_id: str, player_o_id: str, room_id: str) -> Room:
         with self._lock:
-            room_id = str(uuid.uuid4())[:8]
+            if room_id in self._rooms:
+                raise ValueError(f"room_id {room_id} da ton tai")
             room = Room(room_id=room_id, player_x=player_x_id, player_o=player_o_id)
             self._rooms[room_id] = room
             return room

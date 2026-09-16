@@ -109,10 +109,10 @@ def main():
     test_get_rong_tra_None()
     test_hang_doi_day()
 
-    print("=" * 55)
+    print("=" * 50)
     print(" Tat ca test da qua")
     print(" Instance dung chung san sang, size =", db_queue.size())
-    print("=" * 55)
+    print("=" * 50)
 
 
 if __name__ == "__main__":
