@@ -151,10 +151,16 @@ def main():
     test_get_rong_khong_treo()
     test_join_cho_xu_ly_xong()
 
+
     print("=" * 58)
     print(" Tat ca test da qua")
     print(" Instance dung chung san sang, size =", db_queue.size())
     print("=" * 58)
+
+    print("=" * 50)
+    print(" Tat ca test da qua")
+    print(" Instance dung chung san sang, size =", db_queue.size())
+    print("=" * 50)
 
 
 if __name__ == "__main__":

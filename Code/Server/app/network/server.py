@@ -7,6 +7,9 @@ from app.matchmaking.invite_manager import InviteManager
 from app.matchmaking.player_manager import PlayerManager
 from app.matchmaking.room_manager import RoomManager
 from app.network.connection import Connection
+from app.queue.db_queue import db_queue
+from app.queue.db_writer import DBWriter
+from app.db import SessionLocal
 
 
 logger = logging.getLogger(__name__)
@@ -21,10 +24,18 @@ class ServerHandler:
         self.rooms = RoomManager()
         self.invitation = InviteManager(self.connected_users, self.rooms)
         self.message_handler = MessageHandler(
-            self.connected_users, self.rooms, self.invitation
+            self.connected_users, 
+            self.rooms, 
+            self.invitation,
+            SessionLocal,
+            db_queue,
         )
 
         self.sel = selectors.DefaultSelector()
+
+        # Luong duy nhat duoc ghi vao database. Vong lap selector ben duoi
+        # chi day event vao hang doi roi di tiep, khong cho commit.
+        self.db_writer = DBWriter()
 
     def _accept(self, listener: socket.socket) -> None:
         conn, addr = listener.accept()
@@ -88,6 +99,8 @@ class ServerHandler:
         listener.setblocking(False)
         self.sel.register(listener, selectors.EVENT_READ, data=None)
 
+        self.db_writer.start()
+
         logger.info("Server running on %s:%s", self.host, self.port)
         print(f"Server is running HOST: {self.host} | PORT: {self.port}")
 
@@ -104,4 +117,6 @@ class ServerHandler:
         except KeyboardInterrupt:
             print("\nServer shutting down.")
         finally:
+            # Dung writer truoc khi dong selector.
+            self.db_writer.stop()
             self.sel.close()

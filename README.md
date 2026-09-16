@@ -20,10 +20,10 @@ Mục tiêu của project là xây dựng một hệ thống chơi Caro theo mô
 ## Kiến trúc hệ thống
 
 - Mô hình: Client-Server.
-- Server: Python, WebSocket, PostgreSQL.
+- Server: Python, Socket, PostgreSQL.
 - Client: C#/.NET console client trong giai đoạn kiểm thử.
 - Shared: Lưu cấu trúc message/protocol dùng chung giữa client và server.
-- Protocol: WebSocket message dạng JSON.
+- Protocol: TCP/IP message dạng JSON.
 - Port mặc định của server: `8765`.
 - Port mặc định của PostgreSQL: `5432`.
 
@@ -59,7 +59,7 @@ NETPRO/
 
 ## Cấu trúc message
 
-Client và server trao đổi dữ liệu bằng JSON thông qua WebSocket. Mỗi message nên có trường `type` để xác định loại yêu cầu hoặc sự kiện.
+Client và server trao đổi dữ liệu bằng JSON thông qua Socket. Mỗi message nên có trường `type` để xác định loại yêu cầu hoặc sự kiện.
 
 Ví dụ:
 
@@ -99,9 +99,11 @@ Chi tiết schema dự kiến lưu tại `Code/Shared/message-schema.json`.
 
 Dependency server hiện tại:
 
-- `websockets`
-- `asyncpg`
-- `python-dotenv`
+- sockets
+- asyncpg
+- python-dotenv
+- psycopg2-binary
+- bcrypt
 
 ## Cài đặt
 
