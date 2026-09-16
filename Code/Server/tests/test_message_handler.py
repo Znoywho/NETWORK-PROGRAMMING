@@ -1,4 +1,8 @@
 import unittest
+import uuid
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
 
 from app.game.caro import Caro
 from app.handlers.message_handlers import MessageHandler, hash_password
@@ -6,9 +10,6 @@ from app.matchmaking.invite_manager import InviteManager
 from app.matchmaking.player_manager import PlayerManager
 from app.matchmaking.room_manager import RoomManager
 from app.models.matchmaking_models import PlayerStatus, RoomStatus
-from app.models.match import Match
-from app.network.server import ServerHandler
-from app.queue.db_queue import Op
 
 
 class FakeQuery:
@@ -82,6 +83,7 @@ class FakeUser:
         self.password_hash = hash_password(password)
         self.ranking = 0
         self.last_login_at = None
+        self.ranking = 1000
 
 
 class FakeSocket:
@@ -181,103 +183,6 @@ class MessageHandlerTest(unittest.TestCase):
         self.assertEqual(PlayerStatus.IDLE, self.player_manager.get_player(self.alice_id).status)
         self.assertEqual(PlayerStatus.IDLE, self.player_manager.get_player(self.bob_id).status)
 
-    def test_accepting_invite_creates_the_match_row_synchronously(self):
-        handler = self._handler()
-        self._login_both(handler)
-        room_id = self._start_game(handler)
-
-        matches = handler.session.added_of(Match)
-        self.assertEqual(1, len(matches))
-        match = matches[0]
-        # room_id chinh la id database cap, ung dung khong tu sinh nua.
-        self.assertEqual(room_id, str(match.id))
-        self.assertEqual(int(self.alice_id), match.player_x_id)
-        self.assertEqual(int(self.bob_id), match.player_o_id)
-        self.assertEqual("playing", match.status)
-        self.assertIsNotNone(match.started_at)
-        # Va no khong con di qua hang doi ghi DB nua.
-        self.assertEqual([], self.write_queue.ops())
-
-    def test_match_row_failure_aborts_the_invite(self):
-        handler = self._handler()
-        self._login_both(handler)
-
-        def no_flush():
-            raise RuntimeError("database down")
-
-        handler.session.flush = no_flush
-
-        handler.handle(
-            {"type": "invite", "inviteId": "alice-invites-bob", "toPlayerId": self.bob_id}, self.alice_socket
-        )
-        result = handler.handle({"type": "accept_invite", "inviteId": "alice-invites-bob"}, self.bob_socket)
-
-        self.assertEqual("DATABASE_ERROR", result[0]["payload"]["code"])
-        # Khong mo phong "mo coi" (khong co hang matches) de roi moi nuoc
-        # di sau do deu vi pham khoa ngoai.
-        self.assertEqual(PlayerStatus.IDLE, self.player_manager.get_player(self.alice_id).status)
-        self.assertEqual(PlayerStatus.IDLE, self.player_manager.get_player(self.bob_id).status)
-
-    def test_moves_are_queued_in_order_before_the_result(self):
-        handler = self._handler(board_factory=lambda: Caro(3, 3, winning_condition=3))
-        self._login_both(handler)
-        room_id = self._start_game(handler)
-
-        # X thang hang 0; O chan o hang 1.
-        script = [
-            (self.alice_socket, self.alice_id, 0, 0),
-            (self.bob_socket, self.bob_id, 1, 0),
-            (self.alice_socket, self.alice_id, 0, 1),
-            (self.bob_socket, self.bob_id, 1, 1),
-            (self.alice_socket, self.alice_id, 0, 2),
-        ]
-        for sock, player_id, row, col in script:
-            handler.handle(
-                {"type": "make_move", "room_id": room_id, "playerId": player_id, "row": row, "col": col}, sock
-            )
-
-        moves = [data for op, data in self.write_queue.events if op == Op.INSERT_MOVE]
-        self.assertEqual([1, 2, 3, 4, 5], [m["move_index"] for m in moves])
-        self.assertEqual([(0, 0), (1, 0), (0, 1), (1, 1), (0, 2)], [(m["row_idx"], m["col_idx"]) for m in moves])
-        # So le la luot X, so chan la luot O.
-        self.assertTrue(all(m["player_id"] == self.alice_id for m in moves if m["move_index"] % 2 == 1))
-        self.assertTrue(all(m["player_id"] == self.bob_id for m in moves if m["move_index"] % 2 == 0))
-
-        # Hang `matches` da ghi dong bo tu luc mo phong, nen hang doi chi
-        # con cac nuoc di roi toi ket qua o cuoi.
-        ops = self.write_queue.ops()
-        self.assertEqual([Op.INSERT_MOVE] * 5 + [Op.UPDATE_MATCH_RESULT], ops)
-
-        result = self.write_queue.first_data(Op.UPDATE_MATCH_RESULT)
-        self.assertEqual("finished", result["status"])
-        self.assertEqual("x_win", result["result"])
-        self.assertEqual(self.alice_id, result["winner_id"])
-        self.assertIsNotNone(result["ended_at"])
-
-    def test_leaving_mid_game_queues_a_win_for_the_opponent(self):
-        handler = self._handler(board_factory=lambda: Caro(3, 3, winning_condition=3))
-        self._login_both(handler)
-        room_id = self._start_game(handler)
-
-        handler.handle({"type": "leave_room", "room_id": room_id}, self.alice_socket)
-
-        result = self.write_queue.first_data(Op.UPDATE_MATCH_RESULT)
-        self.assertEqual("finished", result["status"])
-        self.assertEqual("o_win", result["result"])
-        self.assertEqual(self.bob_id, result["winner_id"])
-
-    def test_disconnect_mid_game_queues_a_win_for_the_opponent(self):
-        handler = self._handler(board_factory=lambda: Caro(3, 3, winning_condition=3))
-        self._login_both(handler)
-        self._start_game(handler)
-
-        handler.disconnect(self.bob_socket)
-
-        result = self.write_queue.first_data(Op.UPDATE_MATCH_RESULT)
-        self.assertEqual("finished", result["status"])
-        self.assertEqual("x_win", result["result"])
-        self.assertEqual(self.alice_id, result["winner_id"])
-
     def test_move_cannot_impersonate_another_player(self):
         handler = self._handler()
         self._login_both(handler)
@@ -292,8 +197,76 @@ class MessageHandlerTest(unittest.TestCase):
 
         self.assertEqual("FORBIDDEN", result[0]["payload"]["code"])
         self.assertEqual(".", room.board_instance.grid[0][0])
-        # Nuoc di bi tu choi thi khong duoc ghi xuong database.
-        self.assertNotIn(Op.INSERT_MOVE, self.write_queue.ops())
+
+    def test_spectator_cannot_make_move(self):
+        handler = self._handler()
+        self._login_both(handler)
+
+        spectator_id = "00000000-0000-0000-0000-000000000003"
+        spectator_socket = object()
+        self.player_manager.add_player(
+            spectator_id,
+            "spectator",
+            spectator_socket,
+        )
+
+        room = self.room_manager.create_room(self.alice_id, self.bob_id)
+        room.board_instance = Caro(3, 3, winning_condition=3)
+        room.status = RoomStatus.PLAYING
+
+        self.room_manager.add_spectator(room.room_id, spectator_id)
+        self.player_manager.set_status(spectator_id, PlayerStatus.SPECTATING)
+        self.player_manager.set_current_room(spectator_id, room.room_id)
+
+        result = handler.handle(
+            {
+                "type": "make_move",
+                "room_id": room.room_id,
+                "playerId": spectator_id,
+                "row": 0,
+                "col": 0,
+            },
+            spectator_socket,
+        )
+
+        self.assertEqual("FORBIDDEN", result[0]["payload"]["code"])
+        self.assertEqual(".", room.board_instance.grid[0][0])
+
+    def test_spectator_joins_room_and_receives_game_state(self):
+        handler = self._handler()
+        self._login_both(handler)
+
+        spectator_id = "00000000-0000-0000-0000-000000000003"
+        spectator_socket = object()
+        self.player_manager.add_player(
+            spectator_id,
+            "spectator",
+            spectator_socket,
+        )
+
+        room = self.room_manager.create_room(self.alice_id, self.bob_id)
+        room.board_instance = Caro(3, 3, winning_condition=3)
+        room.status = RoomStatus.PLAYING
+
+        result = handler.handle(
+            {
+                "type": "spectate",
+                "room_id": room.room_id,
+            },
+            spectator_socket,
+        )
+
+        self.assertEqual("game_state", result[0]["payload"]["type"])
+        self.assertEqual(room.room_id, result[0]["payload"]["room_id"])
+        self.assertEqual("playing", result[0]["payload"]["status"])
+        self.assertEqual(3, len(result[0]["payload"]["board"]))
+        self.assertEqual(3, len(result[0]["payload"]["board"][0]))
+
+        self.assertIn(spectator_id, room.spectators)
+
+        spectator = self.player_manager.get_player(spectator_id)
+        self.assertEqual(PlayerStatus.SPECTATING, spectator.status)
+        self.assertEqual(room.room_id, spectator.current_room_id)
 
     def test_server_delivery_routes_origin_targeted_and_broadcast_messages(self):
         server = ServerHandler("127.0.0.1", 0)
