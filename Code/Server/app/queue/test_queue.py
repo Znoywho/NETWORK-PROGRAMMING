@@ -1,96 +1,100 @@
-import asyncio
+"""
+Test DBQueue.
+
+Chay:  python -m app.queue.test_queue
+"""
+
+import threading
 
 from app.queue.db_queue import DBQueue, Op, db_queue
 
 
-async def test_thu_tu_fifo():
-    """Event lay ra phai dung thu tu da day vao."""
+def test_put_va_get():
+    """Bo mot viec vao roi lay ra thi phai con nguyen."""
     q = DBQueue()
-    for i in range(5):
-        await q.put(Op.INSERT_MOVE, {"move_index": i})
+    q.put(Op.INSERT_MOVE, {"row_idx": 3, "col_idx": 7})
+
+    viec = q.get()
+    assert viec["op"] == Op.INSERT_MOVE
+    assert viec["data"] == {"row_idx": 3, "col_idx": 7}
+    q.task_done()
+    print("[OK] put/get giu nguyen noi dung")
+
+
+def test_thu_tu_fifo():
+    """Lay ra phai dung thu tu da bo vao.
+
+    Cac nuoc di phai xuong DB theo dung thu tu danh, va UPDATE_MATCH_RESULT
+    phai la viec cuoi cung — khong thi lich su doc ra se thay van ket thuc
+    truoc khi co du nuoc di.
+    """
+    q = DBQueue()
+    for i in range(1, 4):
+        q.put(Op.INSERT_MOVE, {"move_index": i})
+    q.put(Op.UPDATE_MATCH_RESULT, {"match_id": 1})
 
     thu_tu = []
-    for _ in range(5):
-        event = await q.get()
-        thu_tu.append(event["data"]["move_index"])
+    for _ in range(4):
+        thu_tu.append(q.get()["op"])
         q.task_done()
 
-    assert thu_tu == [0, 1, 2, 3, 4], f"Sai thu tu: {thu_tu}"
-    print("[OK] Thu tu FIFO dung:", thu_tu)
+    assert thu_tu == [Op.INSERT_MOVE, Op.INSERT_MOVE, Op.INSERT_MOVE, Op.UPDATE_MATCH_RESULT]
+    print("[OK] FIFO dung, UPDATE_MATCH_RESULT di cuoi")
 
 
-async def test_op_khong_hop_le():
-    """Op la khong duoc vao hang doi."""
-    q = DBQueue()
-    ket_qua = await q.put("xoa_het_database", {})
-    assert ket_qua is False
-    assert q.size() == 0
-    print("[OK] Da chan op khong hop le")
-
-
-async def test_hang_doi_day():
-    """Hang doi day thi bo event, khong treo server."""
-    q = DBQueue(maxsize=3)
-    for i in range(3):
-        await q.put(Op.INSERT_MOVE, {"move_index": i})
-
-    print("     Hang doi da day, thu day them (cho ~2 giay)...")
-    ket_qua = await q.put(Op.INSERT_MOVE, {"move_index": 99})
-
-    assert ket_qua is False
-    assert q.dropped() == 1
-    print("[OK] Bo event khi day, so event da bo:", q.dropped())
-
-
-async def test_nhieu_nguon_day_song_song():
-    """Mo phong nhieu client cung ghi mot luc."""
+def test_nhieu_thread_cung_day():
+    """Nhieu client ghi mot luc thi khong duoc mat viec nao."""
     q = DBQueue()
 
-    async def client(ten: str, so_nuoc: int):
+    def client(ten, so_nuoc):
         for i in range(so_nuoc):
-            await q.put(Op.INSERT_MOVE, {"player": ten, "move_index": i})
-            await asyncio.sleep(0)  # nhuong luot cho client khac
+            q.put(Op.INSERT_MOVE, {"player": ten, "move_index": i})
 
-    await asyncio.gather(
-        client("player_x", 10),
-        client("player_o", 10),
-        client("spectator_log", 5),
-    )
+    threads = [
+        threading.Thread(target=client, args=("player_x", 10)),
+        threading.Thread(target=client, args=("player_o", 10)),
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
 
-    assert q.size() == 25, f"Thieu event, chi co {q.size()}"
-    print("[OK] 3 nguon day song song, nhan du", q.size(), "event")
+    assert q.size() == 20, f"Thieu viec, chi con {q.size()}"
+    print("[OK] 2 thread day song song, nhan du", q.size(), "viec")
 
 
-async def test_requeue():
-    """Event ghi that bai duoc day lai voi retry_count tang."""
+def test_join_cho_ghi_xong():
+    """join() phai cho toi khi moi viec deu task_done()."""
     q = DBQueue()
-    await q.put(Op.INSERT_MATCH, {"id": "abc123"})
+    for i in range(5):
+        q.put(Op.INSERT_MOVE, {"move_index": i})
 
-    event = await q.get()
-    assert event["retry_count"] == 0
+    def writer_gia():
+        for _ in range(5):
+            q.get()
+            q.task_done()
 
-    await q.requeue(event)
-    event_lai = await q.get()
-    assert event_lai["retry_count"] == 1
-    print("[OK] Requeue hoat dong, retry_count =", event_lai["retry_count"])
+    threading.Thread(target=writer_gia).start()
+    q.join()  # chan o day cho toi khi writer gia xu ly het
+    assert q.size() == 0
+    print("[OK] join() cho den khi hang doi sach")
 
 
-async def main():
-    print("=" * 55)
-    print(" TEST DBQueue - Module 3 Task 6, 7")
-    print("=" * 55)
+def main():
+    print("=" * 50)
+    print(" TEST DBQueue")
+    print("=" * 50)
 
-    await test_thu_tu_fifo()
-    await test_op_khong_hop_le()
-    await test_nhieu_nguon_day_song_song()
-    await test_requeue()
-    await test_hang_doi_day()
+    test_put_va_get()
+    test_thu_tu_fifo()
+    test_nhieu_thread_cung_day()
+    test_join_cho_ghi_xong()
 
-    print("=" * 55)
+    print("=" * 50)
     print(" Tat ca test da qua")
     print(" Instance dung chung san sang, size =", db_queue.size())
-    print("=" * 55)
+    print("=" * 50)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

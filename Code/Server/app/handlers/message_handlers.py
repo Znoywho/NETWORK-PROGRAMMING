@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import bcrypt
@@ -15,7 +15,9 @@ from app.matchmaking.invite_manager import InviteManager
 from app.matchmaking.player_manager import PlayerManager
 from app.matchmaking.room_manager import RoomManager
 from app.models.matchmaking_models import PlayerStatus, Room, RoomStatus
+from app.models.match import Match
 from app.models.user import User
+from app.queue.db_queue import Op, db_queue
 
 BOARD_ROWS = 15
 BOARD_COLS = 15
@@ -23,6 +25,16 @@ WINNING_CONDITION = 5
 K = 32
 
 logger = logging.getLogger(__name__)
+
+
+def as_db_id(value: object) -> int | None:
+    """playerId/room_id di qua JSON la chuoi, con khoa chinh trong DB la BIGINT.
+
+    Giao thuc voi client giu nguyen kieu chuoi (GameMessages.cs khai bao
+    PlayerId/MatchId la `string`), nen viec doi kieu chi xay ra ngay sat
+    bien gioi database.
+    """
+    return int(value) if value is not None else None
 
 
 def hash_password(password: str) -> str:
@@ -56,14 +68,15 @@ class MessageHandler:
         player_manager: PlayerManager,
         room_manager: RoomManager,
         invite_manager: InviteManager,
-        *,
         db_session=None,
+        write_queue=None,
         board_factory: Callable[[], Caro] | None = None,
     ):
         self.pm = player_manager
         self.rm = room_manager
         self.im = invite_manager
         self.session = db_session if db_session is not None else session
+        self.write_queue = write_queue if write_queue is not None else db_queue
         self.board_factory = board_factory or self._new_board
 
     def handle(self, message: object, sock: object) -> list[dict[str, Any]]:
@@ -128,6 +141,8 @@ class MessageHandler:
         if room and player_id in (room.player_x, room.player_o) and room.status == RoomStatus.PLAYING:
             opponent_id = room.player_o if player_id == room.player_x else room.player_x
             room.status = RoomStatus.FINISHED
+            # Ghi ket qua du con ai online de nhan thong bao hay khong.
+            self._persist_match_result(room, opponent_id)
             self._set_player_idle(opponent_id)
             for spectator_id in room.spectators:
                 self._set_player_idle(spectator_id)
@@ -215,6 +230,8 @@ class MessageHandler:
                 }),
             ]
 
+        
+
     def changeUser(self, user: User):
         if user:
             try:
@@ -282,7 +299,15 @@ class MessageHandler:
             self.im.reject_invite(invite_id)
             return [self._error("INVITER_OFFLINE", "The inviting player is no longer online.")]
 
-        result = self.im.accept_invite(invite_id, self.board_factory)
+        # Tao hang `matches` TRUOC, dong bo, de lay id do Postgres cap lam
+        # room_id. Khac voi moves/ket qua (di qua hang doi), buoc nay phai
+        # dong bo vi ca van dau phu thuoc vao id nay — va no chi chay mot
+        # lan moi van nen khong lam nghen vong lap selector dang ke.
+        match_id = self._create_match_row(invite["from"], invite["to"])
+        if match_id is None:
+            return [self._error("DATABASE_ERROR", "Could not create the match record.")]
+
+        result = self.im.accept_invite(invite_id, self.board_factory, str(match_id))
         if not result["success"]:
             return [self._error("INVITE_NOT_FOUND", result["reason"])]
 
@@ -345,6 +370,10 @@ class MessageHandler:
             return [self._error("CELL_OCCUPIED", "That cell is already occupied.")]
 
         board._make_move(row, col)
+        # last_move da gom ca nuoc vua danh, nen do dai chinh la move_index
+        # (bat dau tu 1, so le la luot X).
+        self._persist_move(room, player_id, row, col, len(board.last_move))
+
         recipients = self._room_recipients(room)
         winner = board._get_winner()
         if winner == -1:
@@ -353,6 +382,7 @@ class MessageHandler:
         room.status = RoomStatus.FINISHED
         self.score_player(room, winner)
         winner_id = room.player_x if winner == 0 else room.player_o if winner == 1 else None
+        self._persist_match_result(room, winner_id, drawn=winner == 2)
         for room_player_id in (room.player_x, room.player_o):
             self._set_player_idle(room_player_id)
         for spectator_id in room.spectators:
@@ -369,8 +399,8 @@ class MessageHandler:
         if room.status != RoomStatus.FINISHED:
             return [self._error("ROOM_NOT_FINISHED", "Game room was not finished.")]
 
-        player_x_user = self.session.query(User).filter(User.id == room.player_x).first()
-        player_o_user = self.session.query(User).filter(User.id == room.player_o).first()
+        player_x_user = self.session.query(User).filter(User.id == as_db_id(room.player_x)).first()
+        player_o_user = self.session.query(User).filter(User.id == as_db_id(room.player_o)).first()
 
         if player_x_user is None or player_o_user is None:
             return [self._error(code="USER_NOT_FOUND", message="Player user not found.")]
@@ -393,6 +423,86 @@ class MessageHandler:
         except Exception as e:
             self.session.rollback()
             logger.error(f"Scoring failed for room {room.room_id}: {e}")
+
+    # ------------------------------------------------------------
+    #  Ghi lich su van dau (matches / moves)
+    #
+    #  Mo van: ghi DONG BO (_create_match_row), vi room_id chinh la id
+    #  Postgres cap. Mot lan moi van nen chi phi khong dang ke.
+    #
+    #  Nuoc di va ket qua: di qua DBQueue. Handler chi day event roi tra
+    #  ve ngay, DB Writer o thread rieng moi la ben commit. Day la duong
+    #  ghi day dac nhat, su co database khong duoc lam gian doan van dau.
+    # ------------------------------------------------------------
+    def _enqueue(self, op: str, data: dict[str, Any]) -> None:
+        try:
+            self.write_queue.put(op, data)
+        except Exception:
+            logger.exception("Khong the day event %s vao hang doi ghi DB", op)
+
+    def _create_match_row(self, player_x_id: str, player_o_id: str) -> int | None:
+        """INSERT mot van moi va tra ve id Postgres vua cap, None neu that bai.
+
+        Day la duong ghi DB dong bo duy nhat trong luong van dau. Doi lai,
+        hang `matches` chac chan ton tai truoc moi `moves` tro toi no, nen
+        rang buoc khoa ngoai duoc bao dam boi cau truc chu khong phai nho
+        thu tu FIFO cua hang doi.
+        """
+        match = Match(
+            player_x_id=as_db_id(player_x_id),
+            player_o_id=as_db_id(player_o_id),
+            status=RoomStatus.PLAYING.value,
+            board_rows=BOARD_ROWS,
+            board_cols=BOARD_COLS,
+            win_condition=WINNING_CONDITION,
+            started_at=datetime.now(timezone.utc),
+        )
+        try:
+            self.session.add(match)
+            # flush de lay id ngay (INSERT ... RETURNING), commit sau.
+            self.session.flush()
+            match_id = match.id
+            self.session.commit()
+            return match_id
+        except Exception:
+            self.session.rollback()
+            logger.exception("Khong tao duoc hang matches cho %s vs %s", player_x_id, player_o_id)
+            return None
+
+    def _persist_move(
+        self, room: Room, player_id: str, row: int, col: int, move_index: int
+    ) -> None:
+        self._enqueue(
+            Op.INSERT_MOVE,
+            {
+                "match_id": room.room_id,
+                "player_id": player_id,
+                "row_idx": row,
+                "col_idx": col,
+                "move_index": move_index,
+            },
+        )
+
+    def _persist_match_result(
+        self, room: Room, winner_id: str | None, drawn: bool = False
+    ) -> None:
+        if drawn:
+            result = "draw"
+        elif winner_id is None:
+            result = "aborted"
+        else:
+            result = "x_win" if winner_id == room.player_x else "o_win"
+
+        self._enqueue(
+            Op.UPDATE_MATCH_RESULT,
+            {
+                "match_id": room.room_id,
+                "status": RoomStatus.FINISHED.value,
+                "result": result,
+                "winner_id": winner_id,
+                "ended_at": datetime.now(timezone.utc),
+            },
+        )
 
     def _spectate_handler(self, player_id: str, message: dict[str, Any]) -> list[dict[str, Any]]:
         room_id = message.get("room_id")
@@ -448,6 +558,7 @@ class MessageHandler:
         opponent_id = room.player_o if player_id == room.player_x else room.player_x
         recipients = self._room_recipients(room)
         room.status = RoomStatus.FINISHED
+        self._persist_match_result(room, opponent_id)
         for room_player_id in (room.player_x, room.player_o):
             self._set_player_idle(room_player_id)
         for spectator_id in room.spectators:

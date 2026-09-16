@@ -3,6 +3,10 @@
 --
 --  File nay duoc PostgreSQL tu dong chay lan dau khoi tao container
 --  (mount vao /docker-entrypoint-initdb.d/ trong docker-compose.yml)
+--
+--  Khoa chinh dung BIGSERIAL (so tang dan do Postgres cap) thay vi UUID:
+--  de doc, de tra cuu bang tay, index gon hon. Vi Postgres cap id nen
+--  khong the trung — khong can ung dung tu sinh rot doan roi cau may.
 -- ============================================================
 
 
@@ -11,10 +15,10 @@
 --  Luu tai khoan nguoi choi. id chinh la playerId trong message JSON.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
-    id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    id              BIGSERIAL    PRIMARY KEY,
     username        VARCHAR(32)  NOT NULL UNIQUE,
     password_hash   VARCHAR(255),
-    ranking INT DEFAULT 0, 
+    ranking         INT          DEFAULT 0,
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     last_login_at   TIMESTAMPTZ,
 
@@ -22,21 +26,17 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 COMMENT ON TABLE  users               IS 'Tai khoan nguoi choi';
-COMMENT ON COLUMN users.id            IS 'Tuong ung playerId trong message-schema.json';
+COMMENT ON COLUMN users.id            IS 'Tuong ung playerId trong message-schema.json (gui di duoi dang chuoi so)';
 COMMENT ON COLUMN users.password_hash IS 'Chi luu hash (bcrypt/argon2), KHONG bao gio luu mat khau goc';
 
 
--- ------------------------------------------------------------
---  Bang 2: matches
---  Moi ban ghi la mot van dau. id lay tu room_id cua RoomManager.
--- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS matches (
-    id              VARCHAR(16)  PRIMARY KEY,
-    player_x_id     UUID         NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    player_o_id     UUID         NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    id              BIGSERIAL    PRIMARY KEY,
+    player_x_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    player_o_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     status          VARCHAR(16)  NOT NULL DEFAULT 'waiting',
     result          VARCHAR(16),
-    winner_id       UUID                  REFERENCES users(id) ON DELETE SET NULL,
+    winner_id       BIGINT                REFERENCES users(id) ON DELETE SET NULL,
     board_rows      SMALLINT     NOT NULL DEFAULT 15,
     board_cols      SMALLINT     NOT NULL DEFAULT 15,
     win_condition   SMALLINT     NOT NULL DEFAULT 5,
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS matches (
 );
 
 COMMENT ON TABLE  matches           IS 'Lich su cac van dau';
-COMMENT ON COLUMN matches.id        IS 'Tuong ung matchId trong message JSON, lay tu room_id (uuid4 cat 8 ky tu)';
+COMMENT ON COLUMN matches.id        IS 'Tuong ung matchId/room_id trong message JSON. Postgres cap, khong phai ung dung tu sinh';
 COMMENT ON COLUMN matches.result    IS 'x_win / o_win / draw / aborted. Client tu suy ra win|lose tu goc nhin cua minh';
 
 
@@ -79,8 +79,8 @@ COMMENT ON COLUMN matches.result    IS 'x_win / o_win / draw / aborted. Client t
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS moves (
     id          BIGSERIAL    PRIMARY KEY,
-    match_id    VARCHAR(16)  NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-    player_id   UUID         NOT NULL REFERENCES users(id)   ON DELETE RESTRICT,
+    match_id    BIGINT       NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    player_id   BIGINT       NOT NULL REFERENCES users(id)   ON DELETE RESTRICT,
     row_idx     SMALLINT     NOT NULL,
     col_idx     SMALLINT     NOT NULL,
     move_index  INTEGER      NOT NULL,

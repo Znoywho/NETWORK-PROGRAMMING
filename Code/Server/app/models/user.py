@@ -1,15 +1,15 @@
-import uuid
 from datetime import datetime
 
-from sqlalchemy import INT, UUID, DateTime, String, text
+from sqlalchemy import INT, BigInteger, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import BASE
 
 # CREATE TABLE IF NOT EXISTS users (
-#     id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+#     id              BIGSERIAL    PRIMARY KEY,
 #     username        VARCHAR(32)  NOT NULL UNIQUE,
 #     password_hash   VARCHAR(255),
+#     ranking         INT          DEFAULT 0,
 #     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
 #     last_login_at   TIMESTAMPTZ,
 #
@@ -19,10 +19,7 @@ from app.db import BASE
 
 class User(BASE):
     __tablename__ = "users"
-    id: Mapped[uuid.UUID] = mapped_column(
-            UUID(as_uuid=True), 
-            primary_key=True, 
-            server_default=text("gen_random_uuid()"))
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255))
     ranking: Mapped[int] = mapped_column(INT, default=0)
