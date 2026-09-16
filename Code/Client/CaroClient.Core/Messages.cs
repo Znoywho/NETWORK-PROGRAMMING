@@ -23,6 +23,12 @@ public class OnlinePlayersMessage
     public List<PlayerInfo> Players { get; set; } = new();
 }
 
+public class GetOnlinePlayersMessage
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "get_online_players";
+}
+
 public class PlayerInfo
 {
     [JsonPropertyName("playerId")]
@@ -42,6 +48,51 @@ public class InviteMessage
 
     [JsonPropertyName("inviteId")]
     public string InviteId { get; set; } = string.Empty;
+}
+
+public class InviteReceivedMessage
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "invite_received";
+
+    [JsonPropertyName("inviteId")]
+    public string InviteId { get; set; } = string.Empty;
+
+    [JsonPropertyName("fromPlayerId")]
+    public string FromPlayerId { get; set; } = string.Empty;
+
+    [JsonPropertyName("fromUsername")]
+    public string FromUsername { get; set; } = string.Empty;
+}
+
+public class InviteAcceptedMessage
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "invite_accepted";
+
+    [JsonPropertyName("inviteId")]
+    public string InviteId { get; set; } = string.Empty;
+
+    [JsonPropertyName("matchId")]
+    public string MatchId { get; set; } = string.Empty;
+
+    [JsonPropertyName("playerXId")]
+    public string PlayerXId { get; set; } = string.Empty;
+
+    [JsonPropertyName("playerOId")]
+    public string PlayerOId { get; set; } = string.Empty;
+}
+
+public class InviteRejectedMessage
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "invite_rejected";
+
+    [JsonPropertyName("inviteId")]
+    public string InviteId { get; set; } = string.Empty;
+
+    [JsonPropertyName("reason")]
+    public string? Reason { get; set; }
 }
 
 public class AcceptInviteMessage

@@ -56,6 +56,43 @@ client.OnGameResultReceived += result =>
     Console.WriteLine("========================================");
     gameEnded = true;
 };
+
+client.OnOnlinePlayersReceived += onlinePlayers =>
+{
+    Console.WriteLine();
+    Console.WriteLine("===== NGƯỜI CHƠI ĐANG ONLINE =====");
+    if (onlinePlayers.Players.Count == 0)
+    {
+        Console.WriteLine("Không có người chơi nào đang online.");
+    }
+    else
+    {
+        foreach (PlayerInfo player in onlinePlayers.Players)
+        {
+            Console.WriteLine($"- {player.Username} (ID: {player.PlayerId})");
+        }
+    }
+    Console.WriteLine("===================================");
+};
+
+client.OnInviteReceived += invite =>
+{
+    Console.WriteLine();
+    Console.WriteLine($"[Lời mời] {invite.FromUsername} (ID: {invite.FromPlayerId}) mời bạn thi đấu.");
+    Console.WriteLine($"Gõ /accept {invite.InviteId} để chấp nhận hoặc /reject {invite.InviteId} để từ chối.");
+};
+
+client.OnInviteAccepted += invite =>
+{
+    Console.WriteLine($"[Lời mời] Đã được chấp nhận. Match ID: {invite.MatchId}; X: {invite.PlayerXId}; O: {invite.PlayerOId}.");
+};
+
+client.OnInviteRejected += invite =>
+{
+    string reason = string.IsNullOrWhiteSpace(invite.Reason) ? "Không có lý do." : invite.Reason;
+    Console.WriteLine($"[Lời mời] Bị từ chối. ID: {invite.InviteId}. Lý do: {reason}");
+};
+
 connection.Disconnected += reason =>
 {
     Console.WriteLine($"[mất kết nối] {reason}");
@@ -94,11 +131,11 @@ catch (Exception ex)
 
 Console.WriteLine("Nhập nước đi theo dạng: row col");
 Console.WriteLine("Ví dụ: 2 3");
-Console.WriteLine("Gõ /quit để thoát.");
+PrintHelp();
 
 while (!gameEnded)
 {
-    Console.Write("Nước đi: ");
+    Console.Write("Nước đi/lệnh: ");
     string? input = Console.ReadLine();
 
     if (gameEnded)
@@ -106,9 +143,66 @@ while (!gameEnded)
         break;
     }
 
-    if (input is null || input.Trim().Equals("/quit", StringComparison.OrdinalIgnoreCase))
+    if (input is null)
     {
         break;
+    }
+
+    string command = input.Trim();
+    if (command.Equals("/quit", StringComparison.OrdinalIgnoreCase))
+    {
+        break;
+    }
+
+    if (command.Equals("/help", StringComparison.OrdinalIgnoreCase))
+    {
+        PrintHelp();
+        continue;
+    }
+
+    if (command.Equals("/online", StringComparison.OrdinalIgnoreCase))
+    {
+        await client.GetOnlinePlayersAsync();
+        continue;
+    }
+
+    string[] commandParts = command.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    if (commandParts[0].Equals("/invite", StringComparison.OrdinalIgnoreCase))
+    {
+        if (commandParts.Length < 2)
+        {
+            Console.WriteLine("Cú pháp: /invite <playerId>");
+            continue;
+        }
+
+        await client.SendInviteAsync(commandParts[1], Guid.NewGuid().ToString("N"));
+        Console.WriteLine($"Đã gửi lời mời đến {commandParts[1]}.");
+        continue;
+    }
+
+    if (commandParts[0].Equals("/accept", StringComparison.OrdinalIgnoreCase))
+    {
+        if (commandParts.Length < 2)
+        {
+            Console.WriteLine("Cú pháp: /accept <inviteId>");
+            continue;
+        }
+
+        await client.AcceptInviteAsync(commandParts[1]);
+        continue;
+    }
+
+    if (commandParts[0].Equals("/reject", StringComparison.OrdinalIgnoreCase))
+    {
+        if (commandParts.Length < 2)
+        {
+            Console.WriteLine("Cú pháp: /reject <inviteId> [lý do]");
+            continue;
+        }
+
+        string? reason = commandParts.Length == 3 ? commandParts[2] : null;
+        await client.RejectInviteAsync(commandParts[1], reason);
+        continue;
     }
 
     if (!TryParseMove(input, out int row, out int col))
@@ -154,6 +248,12 @@ static bool TryParseMove(string input, out int row, out int col)
     return int.TryParse(parts[0], out row) &&
            int.TryParse(parts[1], out col);
 }
+
+static void PrintHelp()
+{
+    Console.WriteLine("Lệnh: /online | /invite <playerId> | /accept <inviteId> | /reject <inviteId> [lý do] | /quit");
+}
+
 static void PrintBoard(int[][] board, (int Row, int Col)? lastMove = null)
 {
     if (board == null || board.Length == 0 || board[0].Length == 0)
