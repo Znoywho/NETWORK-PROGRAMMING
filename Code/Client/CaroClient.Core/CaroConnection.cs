@@ -1,13 +1,16 @@
+using System.Buffers.Binary;
 using System.Net.Sockets;
 using System.Text;
 
 namespace CaroClient.Core;
 
 /// <summary>
-/// Kết nối TCP gửi và nhận các message JSON UTF-8, mỗi message kết thúc bằng \n.
+/// Kết nối TCP gửi và nhận JSON UTF-8 với header 4 byte biểu thị độ dài payload theo big-endian.
 /// </summary>
 public sealed class CaroConnection : IAsyncDisposable
 {
+    private const int HeaderLength = sizeof(int);
+    private const int MaxMessageLength = 1024 * 1024;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly SemaphoreSlim _reconnectLock = new(1, 1);
     private TcpClient? _client;
@@ -102,7 +105,15 @@ public sealed class CaroConnection : IAsyncDisposable
             throw new InvalidOperationException("Chưa kết nối TCP tới server.");
         }
 
-        byte[] data = Encoding.UTF8.GetBytes(jsonMessage + "\n");
+        byte[] payload = Encoding.UTF8.GetBytes(jsonMessage);
+        if (payload.Length > MaxMessageLength)
+        {
+            throw new ArgumentOutOfRangeException(nameof(jsonMessage), $"Message cannot exceed {MaxMessageLength} bytes.");
+        }
+
+        byte[] data = new byte[HeaderLength + payload.Length];
+        BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(0, HeaderLength), payload.Length);
+        payload.CopyTo(data, HeaderLength);
 
         await _sendLock.WaitAsync(cancellationToken);
         try
@@ -164,39 +175,35 @@ public sealed class CaroConnection : IAsyncDisposable
 
     private async Task ReceiveLoopAsync(TcpClient client, NetworkStream stream, CancellationToken cancellationToken)
     {
-        byte[] buffer = new byte[8192];
-        var pending = new StringBuilder();
+        byte[] header = new byte[HeaderLength];
 
         try
         {
             while (!cancellationToken.IsCancellationRequested && client.Connected)
             {
-                int bytesRead = await stream.ReadAsync(buffer.AsMemory(), cancellationToken);
-                if (bytesRead == 0)
+                if (!await ReadExactlyAsync(stream, header, cancellationToken))
                 {
                     CloseTransportIfCurrent(client);
                     Disconnected?.Invoke("Server đã đóng kết nối TCP.");
                     return;
                 }
 
-                pending.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
-
-                while (true)
+                int messageLength = BinaryPrimitives.ReadInt32BigEndian(header);
+                if (messageLength <= 0 || messageLength > MaxMessageLength)
                 {
-                    int newlineIndex = pending.ToString().IndexOf('\n');
-                    if (newlineIndex < 0)
-                    {
-                        break;
-                    }
-
-                    string json = pending.ToString(0, newlineIndex).Trim();
-                    pending.Remove(0, newlineIndex + 1);
-
-                    if (!string.IsNullOrWhiteSpace(json))
-                    {
-                        MessageReceived?.Invoke(json);
-                    }
+                    throw new InvalidDataException($"Độ dài message không hợp lệ: {messageLength} byte.");
                 }
+
+                byte[] payload = new byte[messageLength];
+                if (!await ReadExactlyAsync(stream, payload, cancellationToken))
+                {
+                    CloseTransportIfCurrent(client);
+                    Disconnected?.Invoke("Server đã đóng kết nối TCP khi đang gửi message.");
+                    return;
+                }
+
+                string json = Encoding.UTF8.GetString(payload);
+                MessageReceived?.Invoke(json);
             }
         }
         catch (OperationCanceledException)
@@ -208,6 +215,23 @@ public sealed class CaroConnection : IAsyncDisposable
             CloseTransportIfCurrent(client);
             Disconnected?.Invoke($"Mất kết nối TCP bất ngờ: {ex.Message}");
         }
+    }
+
+    private static async Task<bool> ReadExactlyAsync(NetworkStream stream, byte[] buffer, CancellationToken cancellationToken)
+    {
+        int received = 0;
+        while (received < buffer.Length)
+        {
+            int bytesRead = await stream.ReadAsync(buffer.AsMemory(received), cancellationToken);
+            if (bytesRead == 0)
+            {
+                return false;
+            }
+
+            received += bytesRead;
+        }
+
+        return true;
     }
 
     private void CloseTransportIfCurrent(TcpClient client)
