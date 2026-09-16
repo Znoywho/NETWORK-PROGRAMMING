@@ -1,12 +1,10 @@
 using System.Net.Sockets;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace CaroClient.Core;
 
 /// <summary>
-/// TCP client sử dụng các thông điệp JSON mã hóa UTF-8 được phân cách bằng ký tự xuống dòng.
+/// Kết nối TCP gửi và nhận các message JSON UTF-8, mỗi message kết thúc bằng \n.
 /// </summary>
 public sealed class CaroConnection : IAsyncDisposable
 {
@@ -27,12 +25,12 @@ public sealed class CaroConnection : IAsyncDisposable
 
         if (IsConnected)
         {
-            throw new InvalidOperationException("Connection is already open. Create a new CaroConnection instead.");
+            throw new InvalidOperationException("Kết nối đã mở.");
         }
 
         if (!serverUri.Scheme.Equals("tcp", StringComparison.OrdinalIgnoreCase))
         {
-            throw new ArgumentException("The server URI must use the tcp scheme, for example tcp://localhost:8765.", nameof(serverUri));
+            throw new ArgumentException("Địa chỉ server phải có dạng tcp://host:port.", nameof(serverUri));
         }
 
         int port = serverUri.Port > 0 ? serverUri.Port : 8765;
@@ -49,7 +47,7 @@ public sealed class CaroConnection : IAsyncDisposable
 
         if (!IsConnected || _stream is null)
         {
-            throw new InvalidOperationException("TCP connection is not open.");
+            throw new InvalidOperationException("Chưa kết nối TCP tới server.");
         }
 
         byte[] data = Encoding.UTF8.GetBytes(jsonMessage + "\n");
@@ -77,7 +75,7 @@ public sealed class CaroConnection : IAsyncDisposable
                 int bytesRead = await _stream!.ReadAsync(buffer.AsMemory(), cancellationToken);
                 if (bytesRead == 0)
                 {
-                    Disconnected?.Invoke("Server closed the TCP connection.");
+                    Disconnected?.Invoke("Server đã đóng kết nối TCP.");
                     return;
                 }
 
@@ -103,19 +101,17 @@ public sealed class CaroConnection : IAsyncDisposable
         }
         catch (OperationCanceledException)
         {
-            //Client đã chủ động đóng kết nối.
+            // Client chủ động đóng kết nối.
         }
         catch (Exception ex)
         {
-            Disconnected?.Invoke($"Unexpected TCP disconnection: {ex.Message}");
+            Disconnected?.Invoke($"Mất kết nối TCP bất ngờ: {ex.Message}");
         }
     }
-    public async Task<string> ReceiveAsync()
+
+    public async Task DisconnectAsync()
     {
-            if (_client.State != WebSocketState.Open)
-            {
-                return string.Empty;
-            }
+        _receiveLoopCts?.Cancel();
 
         if (_stream is not null)
         {
@@ -129,17 +125,11 @@ public sealed class CaroConnection : IAsyncDisposable
         {
             try
             {
-                await DisconnectAsync();
-                return string.Empty;
+                await _receiveLoopTask;
             }
-            string decoded = Encoding.UTF8.GetString(bufer, 0, result.Count);
-            return decoded;
-    }
-    public async Task DisconnectAsync()
-        {
-            if (_client.State == WebSocketState.Open)
+            catch (OperationCanceledException)
             {
-                // Cancellation trong quá trình ngắt kết nối dự kiến ​​sẽ xảy ra.
+                // Cancellation khi đóng kết nối là bình thường.
             }
         }
     }

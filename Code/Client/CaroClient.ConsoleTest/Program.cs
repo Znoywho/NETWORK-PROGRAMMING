@@ -3,16 +3,14 @@ using System.Text;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-int[][] board = Array.Empty<int[]>();
-
-bool gameEnded = false;
+bool connectionLost = false;
 
 Console.Write("Địa chỉ server (Enter để dùng mặc định tcp://localhost:8765): ");
 string? uriInput = Console.ReadLine();
 
-string serverAddress = string.IsNullOrWhiteSpace(uriInput)
-    ? "tcp://localhost:8765"
-    : uriInput.Trim();
+Uri serverUri = string.IsNullOrWhiteSpace(uriInput)
+    ? new Uri("tcp://localhost:8765")
+    : new Uri(uriInput.Trim());
 
 await using var connection = new CaroConnection();
 var client = new GameClient(connection);
@@ -93,9 +91,13 @@ client.OnInviteRejected += invite =>
     Console.WriteLine($"[Lời mời] Bị từ chối. ID: {invite.InviteId}. Lý do: {reason}");
 };
 
+connection.MessageReceived += json => Console.WriteLine($"[nhận] {json}");
 connection.Disconnected += reason =>
 {
-    Console.WriteLine($"[mất kết nối] {reason}");
+    connectionLost = true;
+    Console.WriteLine();
+    Console.WriteLine($"[MẤT KẾT NỐI] {reason}");
+    Console.WriteLine("Không thể gửi thêm message. Phiên làm việc sẽ kết thúc.");
 };
 
 try
@@ -115,15 +117,7 @@ string username = Console.ReadLine() ?? "player1";
 Console.Write("PlayerId: ");
 string playerId = Console.ReadLine() ?? "p1";
 
-Console.Write("MatchId: ");
-string matchId = Console.ReadLine() ?? "match-1";
-
-try
-{
-    await client.LoginAsync(username, playerId);
-    Console.WriteLine("Đã gửi login.");
-}
-catch (Exception ex)
+while (!connectionLost)
 {
     Console.WriteLine($"Login lỗi: {ex.Message}");
     return;
@@ -138,18 +132,12 @@ while (!gameEnded)
     Console.Write("Nước đi/lệnh: ");
     string? input = Console.ReadLine();
 
-    if (gameEnded)
+    if (connectionLost)
     {
         break;
     }
 
-    if (input is null)
-    {
-        break;
-    }
-
-    string command = input.Trim();
-    if (command.Equals("/quit", StringComparison.OrdinalIgnoreCase))
+    if (input is null || input.Trim().Equals("/quit", StringComparison.OrdinalIgnoreCase))
     {
         break;
     }
@@ -229,92 +217,6 @@ while (!gameEnded)
 }
 
 await connection.DisconnectAsync();
-Console.WriteLine("Đã đóng kết nối.");
-
-static bool TryParseMove(string input, out int row, out int col)
-{
-    row = -1;
-    col = -1;
-
-    var parts = input.Split(
-        new[] { ' ', ',', ';', '\t' },
-        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-    if (parts.Length != 2)
-    {
-        return false;
-    }
-
-    return int.TryParse(parts[0], out row) &&
-           int.TryParse(parts[1], out col);
-}
-
-static void PrintHelp()
-{
-    Console.WriteLine("Lệnh: /online | /invite <playerId> | /accept <inviteId> | /reject <inviteId> [lý do] | /quit");
-}
-
-static void PrintBoard(int[][] board, (int Row, int Col)? lastMove = null)
-{
-    if (board == null || board.Length == 0 || board[0].Length == 0)
-    {
-        Console.WriteLine("Bàn cờ trống.");
-        return;
-    }
-
-    Console.Write("    ");
-    for (int col = 0; col < board[0].Length; col++)
-    {
-        Console.Write($"{col + 1,3}");
-    }
-    Console.WriteLine();
-
-    Console.Write("   ");
-    for (int col = 0; col < board[0].Length; col++)
-    {
-        Console.Write("----");
-    }
-    Console.WriteLine();
-
-    for (int row = 0; row < board.Length; row++)
-    {
-        Console.Write($"{row + 1,2} |");
-
-        for (int col = 0; col < board[row].Length; col++)
-        {
-            int value = board[row][col];
-            char cell = value switch
-            {
-                1 => 'X',
-                2 => 'O',
-                _ => '.'
-            };
-
-            bool isLastMove = lastMove.HasValue && lastMove.Value.Row == row && lastMove.Value.Col == col;
-
-            if (isLastMove)
-            {
-                Console.BackgroundColor = ConsoleColor.DarkYellow;
-                Console.ForegroundColor = ConsoleColor.Black;
-                Console.Write($"{cell,3}");
-                Console.ResetColor();
-            }
-            else
-            {
-                Console.ForegroundColor = value switch
-                {
-                    1 => ConsoleColor.Cyan,
-                    2 => ConsoleColor.Magenta,
-                    _ => ConsoleColor.Gray
-                };
-
-                Console.Write($"{cell,3}");
-                Console.ResetColor();
-            }
-        }
-
-        Console.WriteLine();
-    }
-
-    Console.WriteLine();
-}
+Console.WriteLine(connectionLost
+    ? "Phiên làm việc đã kết thúc do mất kết nối."
+    : "Đã đóng kết nối.");
