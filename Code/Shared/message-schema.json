@@ -48,6 +48,11 @@
           "type": "string",
           "minLength": 1
         },
+        "password": {
+          "type": "string",
+          "minLength": 10
+        },
+
         "playerId": {
           "type": "string",
           "minLength": 1
@@ -75,11 +80,15 @@
               },
               "username": {
                 "type": "string"
+              },
+              "status": {
+                "type": "string"
               }
             },
             "required": [
               "playerId",
-              "username"
+              "username",
+              "status"
             ],
             "additionalProperties": false
           }

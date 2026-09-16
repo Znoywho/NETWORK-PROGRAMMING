@@ -45,6 +45,18 @@ class Caro:
         for i in range(self.rows):
             print(self.grid[i])
 
+    def is_in_bounds(self, row: int, col: int) -> bool:
+        return 0 <= row < self.rows and 0 <= col < self.cols
+ 
+    def is_empty(self, row: int, col: int) -> bool:
+        return self.grid[row][col] == "."
+ 
+    def get_cell(self, row: int, col: int):
+        return self.grid[row][col]
+ 
+    def set_cell(self, row: int, col: int, value: str):
+        self.grid[row][col] = value
+
     def _make_move(self, X: int, Y: int):
         if self.grid[X][Y] != ".":
             return

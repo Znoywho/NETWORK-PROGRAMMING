@@ -1,10 +1,6 @@
-from db import init_db
-from network.server import ServerHandler
-import asyncio
-
-
-def run():
-    init_db() 
+from app.network.server import ServerHandler
 
 if __name__ == "__main__":
-    init_db()
+    server = ServerHandler("0.0.0.0", 8765)
+    print("======== Running Server ========")
+    server.run()

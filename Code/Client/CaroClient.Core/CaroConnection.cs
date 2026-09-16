@@ -1,5 +1,7 @@
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace CaroClient.Core;
 
@@ -108,10 +110,12 @@ public sealed class CaroConnection : IAsyncDisposable
             Disconnected?.Invoke($"Unexpected TCP disconnection: {ex.Message}");
         }
     }
-
-    public async Task DisconnectAsync()
+    public async Task<string> ReceiveAsync()
     {
-        _receiveLoopCts?.Cancel();
+            if (_client.State != WebSocketState.Open)
+            {
+                return string.Empty;
+            }
 
         if (_stream is not null)
         {
@@ -125,9 +129,15 @@ public sealed class CaroConnection : IAsyncDisposable
         {
             try
             {
-                await _receiveLoopTask;
+                await DisconnectAsync();
+                return string.Empty;
             }
-            catch (OperationCanceledException)
+            string decoded = Encoding.UTF8.GetString(bufer, 0, result.Count);
+            return decoded;
+    }
+    public async Task DisconnectAsync()
+        {
+            if (_client.State == WebSocketState.Open)
             {
                 // Cancellation trong quá trình ngắt kết nối dự kiến ​​sẽ xảy ra.
             }
