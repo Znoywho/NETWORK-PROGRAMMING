@@ -203,13 +203,23 @@ class MessageHandler:
 
 
     def _create_user_hanlder(self, message, sock):
-        user = self._check_user(message.get("username").strip())
+        username = message.get("username")
+        password = message.get("password")
+        # Handler nay chay ngoai khoi try/except cua handle(), nen thieu field
+        # ma khong kiem tra la AttributeError lam chet ca server.
+        if not isinstance(username, str) or not username.strip():
+            return [self._error("INVALID_MESSAGE", "username is required.")]
+        if not isinstance(password, str) or len(password) < 10:
+            return [self._error("INVALID_MESSAGE", "password must be at least 10 characters.")]
+
+        username = username.strip()
+        user = self._check_user(username)
         if user is not None:
             return [self._error("USER_ALREADY_EXIST", "This user already exist")]
-        hashed_password = hash_password(message.get("password"))
+        hashed_password = hash_password(password)
 
         user = User(
-                username = message.get("username"),
+                username = username,
                 password_hash = hashed_password,
                 last_login_at = datetime.now()
                 )

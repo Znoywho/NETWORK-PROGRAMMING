@@ -1,14 +1,18 @@
+import sys
 import unittest
 import uuid
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
+# Tro vao thu muc Server chu khong phai Server/app: neu them app/ vao sys.path
+# thi package app/queue/ se che mat module `queue` cua stdlib.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.game.caro import Caro
 from app.handlers.message_handlers import MessageHandler, hash_password
 from app.matchmaking.invite_manager import InviteManager
 from app.matchmaking.player_manager import PlayerManager
 from app.matchmaking.room_manager import RoomManager
+from app.network.server import ServerHandler
 from app.models.matchmaking_models import PlayerStatus, RoomStatus
 
 
@@ -210,7 +214,7 @@ class MessageHandlerTest(unittest.TestCase):
             spectator_socket,
         )
 
-        room = self.room_manager.create_room(self.alice_id, self.bob_id)
+        room = self.room_manager.create_room(self.alice_id, self.bob_id, "99")
         room.board_instance = Caro(3, 3, winning_condition=3)
         room.status = RoomStatus.PLAYING
 
@@ -244,7 +248,7 @@ class MessageHandlerTest(unittest.TestCase):
             spectator_socket,
         )
 
-        room = self.room_manager.create_room(self.alice_id, self.bob_id)
+        room = self.room_manager.create_room(self.alice_id, self.bob_id, "99")
         room.board_instance = Caro(3, 3, winning_condition=3)
         room.status = RoomStatus.PLAYING
 
