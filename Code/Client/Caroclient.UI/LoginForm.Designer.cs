@@ -120,6 +120,7 @@ partial class LoginForm
         // 
         txtPassword.Location = new Point(586, 162);
         txtPassword.Name = "txtPassword";
+        txtPassword.UseSystemPasswordChar = true;
         txtPassword.Size = new Size(215, 27);
         txtPassword.TabIndex = 5;
         // 
