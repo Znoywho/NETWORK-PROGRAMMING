@@ -28,6 +28,8 @@ namespace Caroclient.UI
         private List<List<Button>> Matrix;
         public List<List<Button>> Matrix1 { get => Matrix; set => Matrix = value; }
 
+        public event Action<int>? GameEnded;
+
         #endregion
 
         #region Initialize
@@ -55,6 +57,7 @@ namespace Caroclient.UI
         {
             ChessBoard.Enabled = true;
             ChessBoard.Controls.Clear();
+            CurrentPlayer = 0;
 
             Matrix = new List<List<Button>>();
 
@@ -87,28 +90,101 @@ namespace Caroclient.UI
                 oldButton.Height = 0;
             }
 
+            ChangePlayer();
+
         }
 
         void Btn_Click(object? sender, EventArgs e)
         {
-            Button btn = sender as Button;
+            if (sender is not Button btn)
+                return;
 
             if (btn.BackgroundImage != null) //Không cho thay đổi khi đã đánh 
                 return;
 
+            int movePlayer = CurrentPlayer;
             Mark(btn);
 
-            ChangePlayer();
-
-            if (isEndGame(btn))
+            List<Button>? winningCells = FindWinningCells(btn);
+            if (winningCells is not null)
             {
-                EndGame();
+                EndGame(movePlayer, winningCells);
+                return;
             }
+
+            ChangePlayer();
         }
 
-        private void EndGame()
+        private void EndGame(int winnerIndex, IEnumerable<Button> winningCells)
         {
-            MessageBox.Show("Kết thúc game!");
+            ChessBoard.Enabled = false;
+            HighlightWinningCells(winningCells);
+            GameEnded?.Invoke(winnerIndex);
+        }
+
+        private List<Button>? FindWinningCells(Button lastMove)
+        {
+            Point point = GetChessPoint(lastMove);
+            Image? mark = lastMove.BackgroundImage;
+            if (mark is null)
+            {
+                return null;
+            }
+
+            // Ngang, dọc, chéo chính và chéo phụ.
+            (int Dx, int Dy)[] directions = [(1, 0), (0, 1), (1, 1), (1, -1)];
+            foreach ((int dx, int dy) in directions)
+            {
+                var before = CollectMatchingCells(point, -dx, -dy, mark);
+                var after = CollectMatchingCells(point, dx, dy, mark);
+                before.Reverse();
+
+                var line = new List<Button>(before.Count + after.Count + 1);
+                line.AddRange(before);
+                line.Add(lastMove);
+                line.AddRange(after);
+
+                if (line.Count >= 5)
+                {
+                    return line;
+                }
+            }
+
+            return null;
+        }
+
+        private List<Button> CollectMatchingCells(Point start, int dx, int dy, Image mark)
+        {
+            var cells = new List<Button>();
+            int x = start.X + dx;
+            int y = start.Y + dy;
+
+            while (x >= 0 && x < Cons.CHESS_BOARD_WIDTH && y >= 0 && y < Cons.CHESS_BOARD_HEIGHT)
+            {
+                Button cell = Matrix[y][x];
+                if (cell.BackgroundImage != mark)
+                {
+                    break;
+                }
+
+                cells.Add(cell);
+                x += dx;
+                y += dy;
+            }
+
+            return cells;
+        }
+
+        private static void HighlightWinningCells(IEnumerable<Button> winningCells)
+        {
+            foreach (Button cell in winningCells)
+            {
+                cell.UseVisualStyleBackColor = false;
+                cell.FlatStyle = FlatStyle.Flat;
+                cell.FlatAppearance.BorderSize = 3;
+                cell.FlatAppearance.BorderColor = Color.OrangeRed;
+                cell.BackColor = Color.Gold;
+            }
         }
 
         private bool isEndGame(Button btn)
@@ -151,7 +227,7 @@ namespace Caroclient.UI
                     break;
             }
 
-            return countLeft + countRight == 5;
+            return countLeft + countRight >= 5;
         }
         private bool isEndVertical(Button btn)
         {
@@ -179,7 +255,7 @@ namespace Caroclient.UI
                     break;
             }
 
-            return countTop + countBottom == 5;
+            return countTop + countBottom >= 5;
         }
         private bool isEndPrimary(Button btn)
         {
@@ -213,7 +289,7 @@ namespace Caroclient.UI
                     break;
             }
 
-            return countTop + countBottom == 5;
+            return countTop + countBottom >= 5;
         }
         private bool isEndSub(Button btn)
         {
@@ -247,7 +323,7 @@ namespace Caroclient.UI
                     break;
             }
 
-            return countTop + countBottom == 5;
+            return countTop + countBottom >= 5;
         }
 
         private void Mark(Button btn)
@@ -259,8 +335,6 @@ namespace Caroclient.UI
 
         private void ChangePlayer()
         {
-            PlayerName.Text = Player[CurrentPlayer].Name;
-
             PlayerMark.Image = Player[CurrentPlayer].Mark;
         }
         #endregion

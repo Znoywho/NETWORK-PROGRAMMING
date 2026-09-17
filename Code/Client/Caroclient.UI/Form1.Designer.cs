@@ -29,30 +29,25 @@ partial class Form1
     private void InitializeComponent()
     {
         pnlChessBoard = new Panel();
-        btnConnect = new Button();
-        rtbLog = new RichTextBox();
-        txtUsername = new TextBox();
-        btnLogin = new Button();
-        lstOnlinePlayers = new ListBox();
+        ptbTitle = new PictureBox();
         btnInvite = new Button();
         btnSpectate = new Button();
         btnLeave = new Button();
-        btnAccept = new Button();
-        btnReject = new Button();
-        btnSurrender = new Button();
-        txtChatInput = new TextBox();
-        gbInviteMessage = new GroupBox();
-        lblInviteMessage = new Label();
-        gpChat = new GroupBox();
-        btnSendChat = new Button();
-        txbPlayerName = new TextBox();
+        txbPlayerName1 = new TextBox();
         pctbMark = new PictureBox();
         menuStrip1 = new MenuStrip();
         menuToolStripMenuItem = new ToolStripMenuItem();
         newGameToolStripMenuItem = new ToolStripMenuItem();
+        thôngTinToolStripMenuItem = new ToolStripMenuItem();
+        tàiKhoảnCủaTôiToolStripMenuItem = new ToolStripMenuItem();
+        hồSơCủaTôiToolStripMenuItem = new ToolStripMenuItem();
         quitToolStripMenuItem = new ToolStripMenuItem();
-        gbInviteMessage.SuspendLayout();
-        gpChat.SuspendLayout();
+        button1 = new Button();
+        button2 = new Button();
+        txtPlayerName2 = new TextBox();
+        txtScorePlayer2 = new TextBox();
+        txtScorePlayer1 = new TextBox();
+        ((System.ComponentModel.ISupportInitialize)ptbTitle).BeginInit();
         ((System.ComponentModel.ISupportInitialize)pctbMark).BeginInit();
         menuStrip1.SuspendLayout();
         SuspendLayout();
@@ -62,181 +57,65 @@ partial class Form1
         pnlChessBoard.BackColor = SystemColors.ButtonFace;
         pnlChessBoard.BackgroundImage = Properties.Resources.abfa03f6_6d65_453f_9081_0ae2d9165caa;
         pnlChessBoard.ForeColor = SystemColors.ButtonHighlight;
-        pnlChessBoard.Location = new Point(26, 119);
+        pnlChessBoard.Location = new Point(187, 112);
         pnlChessBoard.Name = "pnlChessBoard";
-        pnlChessBoard.Size = new Size(450, 450);
+        pnlChessBoard.Size = new Size(424, 460);
         pnlChessBoard.TabIndex = 0;
         pnlChessBoard.Paint += pnlChessBoard_Paint;
         // 
-        // btnConnect
+        // ptbTitle
         // 
-        btnConnect.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        btnConnect.Location = new Point(515, 73);
-        btnConnect.Name = "btnConnect";
-        btnConnect.Size = new Size(341, 32);
-        btnConnect.TabIndex = 1;
-        btnConnect.Text = "Kết nối WebSocket";
-        btnConnect.UseVisualStyleBackColor = true;
-        // 
-        // rtbLog
-        // 
-        rtbLog.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        rtbLog.Location = new Point(519, 390);
-        rtbLog.Name = "rtbLog";
-        rtbLog.Size = new Size(337, 94);
-        rtbLog.TabIndex = 2;
-        rtbLog.Text = "";
-        // 
-        // txtUsername
-        // 
-        txtUsername.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        txtUsername.Location = new Point(515, 40);
-        txtUsername.Name = "txtUsername";
-        txtUsername.Size = new Size(175, 27);
-        txtUsername.TabIndex = 3;
-        txtUsername.Text = "Player_01";
-        // 
-        // btnLogin
-        // 
-        btnLogin.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        btnLogin.Location = new Point(702, 40);
-        btnLogin.Name = "btnLogin";
-        btnLogin.Size = new Size(154, 28);
-        btnLogin.TabIndex = 4;
-        btnLogin.Text = "Đăng nhập";
-        btnLogin.UseVisualStyleBackColor = true;
-        // 
-        // lstOnlinePlayers
-        // 
-        lstOnlinePlayers.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        lstOnlinePlayers.FormattingEnabled = true;
-        lstOnlinePlayers.Location = new Point(515, 119);
-        lstOnlinePlayers.Name = "lstOnlinePlayers";
-        lstOnlinePlayers.Size = new Size(339, 84);
-        lstOnlinePlayers.TabIndex = 5;
+        ptbTitle.Image = Properties.Resources.title;
+        ptbTitle.Location = new Point(287, 31);
+        ptbTitle.Name = "ptbTitle";
+        ptbTitle.Size = new Size(237, 75);
+        ptbTitle.SizeMode = PictureBoxSizeMode.Zoom;
+        ptbTitle.TabIndex = 20;
+        ptbTitle.TabStop = false;
         // 
         // btnInvite
         // 
         btnInvite.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        btnInvite.Location = new Point(519, 213);
+        btnInvite.Location = new Point(24, 214);
         btnInvite.Name = "btnInvite";
-        btnInvite.Size = new Size(102, 29);
+        btnInvite.Size = new Size(129, 29);
         btnInvite.TabIndex = 6;
-        btnInvite.Text = "Mời đấu";
+        btnInvite.Text = "Bạn bè";
         btnInvite.UseVisualStyleBackColor = true;
+        btnInvite.Click += btnInvite_Click;
         // 
         // btnSpectate
         // 
         btnSpectate.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        btnSpectate.Location = new Point(639, 213);
+        btnSpectate.Location = new Point(24, 286);
         btnSpectate.Name = "btnSpectate";
-        btnSpectate.Size = new Size(102, 29);
+        btnSpectate.Size = new Size(129, 29);
         btnSpectate.TabIndex = 7;
-        btnSpectate.Text = "Xem trận";
+        btnSpectate.Text = "Lịch sử ";
         btnSpectate.UseVisualStyleBackColor = true;
-        btnSpectate.Click += button2_Click;
+        btnSpectate.Click += btnSpectate_Click;
         // 
         // btnLeave
         // 
         btnLeave.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        btnLeave.Location = new Point(754, 213);
+        btnLeave.Location = new Point(24, 425);
         btnLeave.Name = "btnLeave";
-        btnLeave.Size = new Size(102, 29);
+        btnLeave.Size = new Size(129, 29);
         btnLeave.TabIndex = 8;
-        btnLeave.Text = "Rời phòng";
+        btnLeave.Text = "Chơi với máy";
         btnLeave.UseVisualStyleBackColor = true;
         // 
-        // btnAccept
+        // txbPlayerName1
         // 
-        btnAccept.Location = new Point(33, 71);
-        btnAccept.Name = "btnAccept";
-        btnAccept.Size = new Size(94, 29);
-        btnAccept.TabIndex = 9;
-        btnAccept.Text = "Chấp nhận";
-        btnAccept.UseVisualStyleBackColor = true;
-        // 
-        // btnReject
-        // 
-        btnReject.Location = new Point(198, 71);
-        btnReject.Name = "btnReject";
-        btnReject.Size = new Size(94, 29);
-        btnReject.TabIndex = 10;
-        btnReject.Text = "Từ chối";
-        btnReject.UseVisualStyleBackColor = true;
-        // 
-        // btnSurrender
-        // 
-        btnSurrender.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        btnSurrender.Location = new Point(558, 357);
-        btnSurrender.Name = "btnSurrender";
-        btnSurrender.Size = new Size(94, 29);
-        btnSurrender.TabIndex = 11;
-        btnSurrender.Text = "Đầu hàng";
-        btnSurrender.UseVisualStyleBackColor = true;
-        // 
-        // txtChatInput
-        // 
-        txtChatInput.Location = new Point(15, 26);
-        txtChatInput.Name = "txtChatInput";
-        txtChatInput.Size = new Size(216, 27);
-        txtChatInput.TabIndex = 12;
-        txtChatInput.Text = "Nhập tin nhắn: ";
-        // 
-        // gbInviteMessage
-        // 
-        gbInviteMessage.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        gbInviteMessage.Controls.Add(lblInviteMessage);
-        gbInviteMessage.Controls.Add(btnReject);
-        gbInviteMessage.Controls.Add(btnAccept);
-        gbInviteMessage.Location = new Point(519, 248);
-        gbInviteMessage.Name = "gbInviteMessage";
-        gbInviteMessage.Size = new Size(335, 106);
-        gbInviteMessage.TabIndex = 13;
-        gbInviteMessage.TabStop = false;
-        gbInviteMessage.Text = "Lời mời thách đấu";
-        gbInviteMessage.Enter += groupBox1_Enter;
-        // 
-        // lblInviteMessage
-        // 
-        lblInviteMessage.AutoSize = true;
-        lblInviteMessage.Location = new Point(95, 35);
-        lblInviteMessage.Name = "lblInviteMessage";
-        lblInviteMessage.Size = new Size(152, 20);
-        lblInviteMessage.TabIndex = 11;
-        lblInviteMessage.Text = "Chưa có lời mời nào...";
-        lblInviteMessage.Click += label1_Click;
-        // 
-        // gpChat
-        // 
-        gpChat.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        gpChat.Controls.Add(btnSendChat);
-        gpChat.Controls.Add(txtChatInput);
-        gpChat.Location = new Point(521, 490);
-        gpChat.Name = "gpChat";
-        gpChat.Size = new Size(335, 69);
-        gpChat.TabIndex = 14;
-        gpChat.TabStop = false;
-        gpChat.Text = "Trò chuyện";
-        // 
-        // btnSendChat
-        // 
-        btnSendChat.Location = new Point(235, 26);
-        btnSendChat.Name = "btnSendChat";
-        btnSendChat.Size = new Size(94, 29);
-        btnSendChat.TabIndex = 13;
-        btnSendChat.Text = "Gửi";
-        btnSendChat.UseVisualStyleBackColor = true;
-        // 
-        // txbPlayerName
-        // 
-        txbPlayerName.Location = new Point(122, 54);
-        txbPlayerName.Name = "txbPlayerName";
-        txbPlayerName.Size = new Size(125, 27);
-        txbPlayerName.TabIndex = 15;
+        txbPlayerName1.Location = new Point(684, 134);
+        txbPlayerName1.Name = "txbPlayerName1";
+        txbPlayerName1.ReadOnly = true;
+        txbPlayerName1.Size = new Size(125, 27);
+        txbPlayerName1.TabIndex = 15;
         // 
         // pctbMark
         // 
-        pctbMark.Location = new Point(272, 29);
+        pctbMark.Location = new Point(693, 227);
         pctbMark.Name = "pctbMark";
         pctbMark.Size = new Size(106, 88);
         pctbMark.SizeMode = PictureBoxSizeMode.StretchImage;
@@ -250,13 +129,13 @@ partial class Form1
         menuStrip1.Items.AddRange(new ToolStripItem[] { menuToolStripMenuItem });
         menuStrip1.Location = new Point(0, 0);
         menuStrip1.Name = "menuStrip1";
-        menuStrip1.Size = new Size(888, 28);
+        menuStrip1.Size = new Size(858, 28);
         menuStrip1.TabIndex = 17;
         menuStrip1.Text = "menuStrip1";
         // 
         // menuToolStripMenuItem
         // 
-        menuToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { newGameToolStripMenuItem, quitToolStripMenuItem });
+        menuToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { newGameToolStripMenuItem, thôngTinToolStripMenuItem, quitToolStripMenuItem });
         menuToolStripMenuItem.Name = "menuToolStripMenuItem";
         menuToolStripMenuItem.Size = new Size(60, 24);
         menuToolStripMenuItem.Text = "Menu";
@@ -264,16 +143,86 @@ partial class Form1
         // newGameToolStripMenuItem
         // 
         newGameToolStripMenuItem.Name = "newGameToolStripMenuItem";
-        newGameToolStripMenuItem.Size = new Size(224, 26);
+        newGameToolStripMenuItem.Size = new Size(164, 26);
         newGameToolStripMenuItem.Text = "New game";
         newGameToolStripMenuItem.Click += newGameToolStripMenuItem_Click;
+        // 
+        // thôngTinToolStripMenuItem
+        // 
+        thôngTinToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { tàiKhoảnCủaTôiToolStripMenuItem, hồSơCủaTôiToolStripMenuItem });
+        thôngTinToolStripMenuItem.Name = "thôngTinToolStripMenuItem";
+        thôngTinToolStripMenuItem.Size = new Size(164, 26);
+        thôngTinToolStripMenuItem.Text = "Thông tin ";
+        thôngTinToolStripMenuItem.Click += thôngTinToolStripMenuItem_Click;
+        // 
+        // tàiKhoảnCủaTôiToolStripMenuItem
+        // 
+        tàiKhoảnCủaTôiToolStripMenuItem.Name = "tàiKhoảnCủaTôiToolStripMenuItem";
+        tàiKhoảnCủaTôiToolStripMenuItem.Size = new Size(203, 26);
+        tàiKhoảnCủaTôiToolStripMenuItem.Text = "Tài khoản của tôi";
+        tàiKhoảnCủaTôiToolStripMenuItem.Click += tàiKhoảnCủaTôiToolStripMenuItem_Click;
+        // 
+        // hồSơCủaTôiToolStripMenuItem
+        // 
+        hồSơCủaTôiToolStripMenuItem.Name = "hồSơCủaTôiToolStripMenuItem";
+        hồSơCủaTôiToolStripMenuItem.Size = new Size(203, 26);
+        hồSơCủaTôiToolStripMenuItem.Text = "Hồ sơ của tôi";
+        hồSơCủaTôiToolStripMenuItem.Click += hồSơCủaTôiToolStripMenuItem_Click;
         // 
         // quitToolStripMenuItem
         // 
         quitToolStripMenuItem.Name = "quitToolStripMenuItem";
-        quitToolStripMenuItem.Size = new Size(224, 26);
+        quitToolStripMenuItem.Size = new Size(164, 26);
         quitToolStripMenuItem.Text = "Quit";
         quitToolStripMenuItem.Click += quitToolStripMenuItem_Click;
+        // 
+        // button1
+        // 
+        button1.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        button1.Location = new Point(24, 151);
+        button1.Name = "button1";
+        button1.Size = new Size(129, 29);
+        button1.TabIndex = 18;
+        button1.Text = "Nhắn tin";
+        button1.UseVisualStyleBackColor = true;
+        button1.Click += button1_Click;
+        // 
+        // button2
+        // 
+        button2.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        button2.Location = new Point(24, 358);
+        button2.Name = "button2";
+        button2.Size = new Size(129, 29);
+        button2.TabIndex = 19;
+        button2.Text = "Mời đấu";
+        button2.UseVisualStyleBackColor = true;
+        button2.Click += button2_Click;
+        // 
+        // txtPlayerName2
+        // 
+        txtPlayerName2.Location = new Point(684, 341);
+        txtPlayerName2.Name = "txtPlayerName2";
+        txtPlayerName2.ReadOnly = true;
+        txtPlayerName2.Size = new Size(125, 27);
+        txtPlayerName2.TabIndex = 15;
+        // 
+        // txtScorePlayer2
+        // 
+        txtScorePlayer2.Location = new Point(684, 377);
+        txtScorePlayer2.Name = "txtScorePlayer2";
+        txtScorePlayer2.ReadOnly = true;
+        txtScorePlayer2.Size = new Size(125, 27);
+        txtScorePlayer2.TabIndex = 15;
+        txtScorePlayer2.TextAlign = HorizontalAlignment.Center;
+        // 
+        // txtScorePlayer1
+        // 
+        txtScorePlayer1.Location = new Point(684, 167);
+        txtScorePlayer1.Name = "txtScorePlayer1";
+        txtScorePlayer1.ReadOnly = true;
+        txtScorePlayer1.Size = new Size(125, 27);
+        txtScorePlayer1.TabIndex = 15;
+        txtScorePlayer1.TextAlign = HorizontalAlignment.Center;
         // 
         // Form1
         // 
@@ -281,20 +230,18 @@ partial class Form1
         AutoScaleMode = AutoScaleMode.Font;
         BackColor = SystemColors.ControlLight;
         BackgroundImage = Properties.Resources.abfa03f6_6d65_453f_9081_0ae2d9165caa;
-        ClientSize = new Size(888, 571);
+        ClientSize = new Size(858, 572);
+        Controls.Add(button1);
+        Controls.Add(button2);
+        Controls.Add(ptbTitle);
         Controls.Add(pctbMark);
-        Controls.Add(txbPlayerName);
-        Controls.Add(gpChat);
-        Controls.Add(gbInviteMessage);
-        Controls.Add(btnSurrender);
+        Controls.Add(txtPlayerName2);
+        Controls.Add(txtScorePlayer1);
+        Controls.Add(txtScorePlayer2);
+        Controls.Add(txbPlayerName1);
         Controls.Add(btnLeave);
         Controls.Add(btnSpectate);
         Controls.Add(btnInvite);
-        Controls.Add(lstOnlinePlayers);
-        Controls.Add(btnLogin);
-        Controls.Add(txtUsername);
-        Controls.Add(rtbLog);
-        Controls.Add(btnConnect);
         Controls.Add(pnlChessBoard);
         Controls.Add(menuStrip1);
         ForeColor = SystemColors.ActiveCaptionText;
@@ -303,10 +250,7 @@ partial class Form1
         Text = "Form1";
         FormClosing += Form1_FormClosing;
         Load += Form1_Load;
-        gbInviteMessage.ResumeLayout(false);
-        gbInviteMessage.PerformLayout();
-        gpChat.ResumeLayout(false);
-        gpChat.PerformLayout();
+        ((System.ComponentModel.ISupportInitialize)ptbTitle).EndInit();
         ((System.ComponentModel.ISupportInitialize)pctbMark).EndInit();
         menuStrip1.ResumeLayout(false);
         menuStrip1.PerformLayout();
@@ -317,10 +261,8 @@ partial class Form1
     #endregion
 
     private Panel pnlChessBoard;
-    private Button btnConnect;
+    private PictureBox ptbTitle;
     private RichTextBox rtbLog;
-    private TextBox txtUsername;
-    private Button btnLogin;
     private ListBox lstOnlinePlayers;
     private Button btnInvite;
     private Button btnSpectate;
@@ -333,11 +275,18 @@ partial class Form1
     private Label lblInviteMessage;
     private GroupBox gpChat;
     private Button btnSendChat;
-    private TextBox textBox1;
     private PictureBox pctbMark;
-    private TextBox txbPlayerName;
+    private TextBox txbPlayerName1;
     private MenuStrip menuStrip1;
     private ToolStripMenuItem menuToolStripMenuItem;
     private ToolStripMenuItem newGameToolStripMenuItem;
     private ToolStripMenuItem quitToolStripMenuItem;
+    private ToolStripMenuItem thôngTinToolStripMenuItem;
+    private ToolStripMenuItem tàiKhoảnCủaTôiToolStripMenuItem;
+    private ToolStripMenuItem hồSơCủaTôiToolStripMenuItem;
+    private Button button1;
+    private Button button2;
+    private TextBox txtPlayerName2;
+    private TextBox txtScorePlayer2;
+    private TextBox txtScorePlayer1;
 }
