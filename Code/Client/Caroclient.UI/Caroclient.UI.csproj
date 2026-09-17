@@ -6,7 +6,20 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Cho phep build/restore project WinForms tren Linux (khong anh huong khi build tren Windows). -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CaroClient.Core\CaroClient.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ChessBoardManager doc anh quan co tu thu muc output luc chay. -->
+    <None Update="Resources\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <Compile Update="Properties\Resources.Designer.cs">

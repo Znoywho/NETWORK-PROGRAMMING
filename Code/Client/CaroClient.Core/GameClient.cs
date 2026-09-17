@@ -1,9 +1,13 @@
-﻿using System;
+using System;
 using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace CaroClient.Core
 {
+    /// <summary>
+    /// Lớp nghiệp vụ: chuyển các thao tác của người chơi thành message JSON theo
+    /// Shared/message-schema.json và phân phối message nhận được thành event.
+    /// </summary>
     public class GameClient
     {
         private readonly CaroConnection _connection;
@@ -12,13 +16,22 @@ namespace CaroClient.Core
             PropertyNameCaseInsensitive = true
         };
 
+        public event Action<AuthResultMessage>? OnLoginSucceeded;
+        public event Action<AuthResultMessage>? OnUserCreated;
         public event Action<GameStateMessage>? OnGameStateReceived;
         public event Action<GameResultMessage>? OnGameResultReceived;
         public event Action<OnlinePlayersMessage>? OnOnlinePlayersReceived;
         public event Action<InviteReceivedMessage>? OnInviteReceived;
-        public event Action<InviteAcceptedMessage>? OnInviteAccepted;
+        public event Action<InviteResultMessage>? OnInviteResult;
         public event Action<InviteRejectedMessage>? OnInviteRejected;
-        public event Action<string>? OnErrorReceived;
+        public event Action<LeaveRoomResultMessage>? OnLeaveRoomResult;
+        public event Action<ErrorMessage>? OnErrorReceived;
+
+        /// <summary>PlayerId do server cấp sau khi login thành công.</summary>
+        public string? PlayerId { get; private set; }
+
+        /// <summary>Username đã đăng nhập.</summary>
+        public string? Username { get; private set; }
 
         public GameClient(CaroConnection connection)
         {
@@ -31,67 +44,43 @@ namespace CaroClient.Core
             await _connection.ConnectAsync(new Uri(uri));
         }
 
-        public async Task LoginAsync(string username, string? playerId = null)
-        {
-            var msg = new LoginMessage
-            {
-                Username = username,
-                PlayerId = playerId
-            };
+        public Task LoginAsync(string username, string password)
+            => SendAsync(new LoginMessage { Username = username, Password = password });
 
-            string json = JsonSerializer.Serialize(msg, JsonOptions);
-            await _connection.SendAsync(json);
-        }
+        public Task CreateUserAsync(string username, string password)
+            => SendAsync(new CreateUserMessage { Username = username, Password = password });
 
-        public async Task MakeMoveAsync(string matchId, string playerId, int row, int col)
-        {
-            var msg = new MakeMoveMessage
+        public Task GetOnlinePlayersAsync()
+            => SendAsync(new GetOnlinePlayersMessage());
+
+        public Task SendInviteAsync(string toPlayerId, string inviteId)
+            => SendAsync(new InviteMessage { ToPlayerId = toPlayerId, InviteId = inviteId });
+
+        public Task AcceptInviteAsync(string inviteId)
+            => SendAsync(new AcceptInviteMessage { InviteId = inviteId });
+
+        public Task RejectInviteAsync(string inviteId, string? reason = null)
+            => SendAsync(new RejectInviteMessage { InviteId = inviteId, Reason = reason });
+
+        public Task MakeMoveAsync(string roomId, string playerId, int row, int col)
+            => SendAsync(new MakeMoveMessage
             {
-                MatchId = matchId,
+                RoomId = roomId,
                 PlayerId = playerId,
                 Row = row,
                 Col = col
-            };
+            });
 
-            string json = JsonSerializer.Serialize(msg, JsonOptions);
-            await _connection.SendAsync(json);
-        }
+        public Task SpectateAsync(string roomId)
+            => SendAsync(new SpectateMessage { RoomId = roomId });
 
-        public async Task SendInviteAsync(string toPlayerId, string inviteId)
+        public Task LeaveRoomAsync(string roomId)
+            => SendAsync(new LeaveRoomMessage { RoomId = roomId });
+
+        private Task SendAsync<T>(T message)
         {
-            var msg = new InviteMessage
-            {
-                ToPlayerId = toPlayerId,
-                InviteId = inviteId
-            };
-
-            string json = JsonSerializer.Serialize(msg, JsonOptions);
-            await _connection.SendAsync(json);
-        }
-
-        public async Task GetOnlinePlayersAsync()
-        {
-            string json = JsonSerializer.Serialize(new GetOnlinePlayersMessage(), JsonOptions);
-            await _connection.SendAsync(json);
-        }
-
-        public async Task AcceptInviteAsync(string inviteId)
-        {
-            var msg = new AcceptInviteMessage { InviteId = inviteId };
-            string json = JsonSerializer.Serialize(msg, JsonOptions);
-            await _connection.SendAsync(json);
-        }
-
-        public async Task RejectInviteAsync(string inviteId, string? reason = null)
-        {
-            var msg = new RejectInviteMessage
-            {
-                InviteId = inviteId,
-                Reason = reason
-            };
-
-            string json = JsonSerializer.Serialize(msg, JsonOptions);
-            await _connection.SendAsync(json);
+            string json = JsonSerializer.Serialize(message, JsonOptions);
+            return _connection.SendAsync(json);
         }
 
         private void HandleIncomingMessage(string json)
@@ -99,9 +88,7 @@ namespace CaroClient.Core
             try
             {
                 using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
-
-                if (!root.TryGetProperty("type", out var typeElement))
+                if (!doc.RootElement.TryGetProperty("type", out var typeElement))
                 {
                     return;
                 }
@@ -110,41 +97,60 @@ namespace CaroClient.Core
 
                 switch (type)
                 {
+                    case "login":
+                        var login = Deserialize<AuthResultMessage>(json);
+                        if (login != null)
+                        {
+                            PlayerId = login.PlayerId;
+                            Username = login.Username;
+                            OnLoginSucceeded?.Invoke(login);
+                        }
+                        break;
+
+                    case "create_user":
+                        var created = Deserialize<AuthResultMessage>(json);
+                        if (created != null) OnUserCreated?.Invoke(created);
+                        break;
+
                     case "game_state":
-                        var stateMsg = JsonSerializer.Deserialize<GameStateMessage>(json, JsonOptions);
-                        if (stateMsg != null) OnGameStateReceived?.Invoke(stateMsg);
+                        var state = Deserialize<GameStateMessage>(json);
+                        if (state != null) OnGameStateReceived?.Invoke(state);
                         break;
 
                     case "game_result":
-                        var resultMsg = JsonSerializer.Deserialize<GameResultMessage>(json, JsonOptions);
-                        if (resultMsg != null) OnGameResultReceived?.Invoke(resultMsg);
+                        var result = Deserialize<GameResultMessage>(json);
+                        if (result != null) OnGameResultReceived?.Invoke(result);
                         break;
 
                     case "online_players":
-                        var playersMsg = JsonSerializer.Deserialize<OnlinePlayersMessage>(json, JsonOptions);
-                        if (playersMsg != null) OnOnlinePlayersReceived?.Invoke(playersMsg);
+                        var players = Deserialize<OnlinePlayersMessage>(json);
+                        if (players != null) OnOnlinePlayersReceived?.Invoke(players);
                         break;
 
-                    case "invite_received":
-                        var inviteMsg = JsonSerializer.Deserialize<InviteReceivedMessage>(json, JsonOptions);
-                        if (inviteMsg != null) OnInviteReceived?.Invoke(inviteMsg);
+                    // Server gửi lời mời với type "invite" (không phải "invite_received").
+                    case "invite":
+                        var invite = Deserialize<InviteReceivedMessage>(json);
+                        if (invite != null) OnInviteReceived?.Invoke(invite);
                         break;
 
-                    case "invite_accepted":
-                        var acceptedMsg = JsonSerializer.Deserialize<InviteAcceptedMessage>(json, JsonOptions);
-                        if (acceptedMsg != null) OnInviteAccepted?.Invoke(acceptedMsg);
+                    case "invite_result":
+                        var inviteResult = Deserialize<InviteResultMessage>(json);
+                        if (inviteResult != null) OnInviteResult?.Invoke(inviteResult);
                         break;
 
                     case "invite_rejected":
-                        var rejectedMsg = JsonSerializer.Deserialize<InviteRejectedMessage>(json, JsonOptions);
-                        if (rejectedMsg != null) OnInviteRejected?.Invoke(rejectedMsg);
+                        var rejected = Deserialize<InviteRejectedMessage>(json);
+                        if (rejected != null) OnInviteRejected?.Invoke(rejected);
+                        break;
+
+                    case "leave_room_result":
+                        var leave = Deserialize<LeaveRoomResultMessage>(json);
+                        if (leave != null) OnLeaveRoomResult?.Invoke(leave);
                         break;
 
                     case "error":
-                        if (root.TryGetProperty("message", out var msgElement))
-                        {
-                            OnErrorReceived?.Invoke(msgElement.GetString() ?? "Lỗi không xác định từ Server");
-                        }
+                        var error = Deserialize<ErrorMessage>(json);
+                        if (error != null) OnErrorReceived?.Invoke(error);
                         break;
                 }
             }
@@ -153,5 +159,7 @@ namespace CaroClient.Core
                 Console.WriteLine($"[GameClient] Lỗi phân tích JSON: {ex.Message}");
             }
         }
+
+        private static T? Deserialize<T>(string json) => JsonSerializer.Deserialize<T>(json, JsonOptions);
     }
 }

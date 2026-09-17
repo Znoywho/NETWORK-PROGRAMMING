@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Text;
@@ -30,6 +30,15 @@ namespace Caroclient.UI
 
         public event Action<int>? GameEnded;
 
+        /// <summary>Bắn ra khi người chơi bấm vào một ô ở chế độ online: (row, col).</summary>
+        public event Action<int, int>? CellClicked;
+
+        /// <summary>
+        /// Bật khi ván đấu do server quyết định: click chỉ gửi nước đi lên server,
+        /// bàn cờ chỉ được vẽ lại khi nhận game_state.
+        /// </summary>
+        public bool OnlineMode { get; set; }
+
         #endregion
 
         #region Initialize
@@ -41,8 +50,8 @@ namespace Caroclient.UI
 
             this.Player = new List<Player>()
             {
-                new Player("NgocHan", Image.FromFile(Application.StartupPath + "\\Resources\\image_x.png")),
-                new Player("Bot", Image.FromFile(Application.StartupPath + "\\Resources\\image_o.png"))
+                new Player("X", Image.FromFile(Path.Combine(Application.StartupPath, "Resources", "image_x.png"))),
+                new Player("O", Image.FromFile(Path.Combine(Application.StartupPath, "Resources", "image_o.png")))
             };
 
             CurrentPlayer1 = 0;
@@ -101,6 +110,14 @@ namespace Caroclient.UI
 
             if (btn.BackgroundImage != null) //Không cho thay đổi khi đã đánh 
                 return;
+
+            if (OnlineMode)
+            {
+                // Server mới là nơi quyết định nước đi có hợp lệ hay không.
+                Point point = GetChessPoint(btn);
+                CellClicked?.Invoke(point.Y, point.X);
+                return;
+            }
 
             int movePlayer = CurrentPlayer;
             Mark(btn);
@@ -336,6 +353,48 @@ namespace Caroclient.UI
         private void ChangePlayer()
         {
             PlayerMark.Image = Player[CurrentPlayer].Mark;
+        }
+
+        /// <summary>Vẽ lại toàn bộ bàn cờ theo ma trận server gửi về (0 = trống, 1 = X, 2 = O).</summary>
+        public void RenderBoard(int[][] board)
+        {
+            if (Matrix is null || Matrix.Count == 0)
+            {
+                DrawChessBoard();
+            }
+
+            List<List<Button>> matrix = Matrix!;
+            for (int row = 0; row < matrix.Count; row++)
+            {
+                for (int col = 0; col < matrix[row].Count; col++)
+                {
+                    Button cell = matrix[row][col];
+                    int value = row < board.Length && col < board[row].Length ? board[row][col] : 0;
+
+                    cell.BackgroundImage = value switch
+                    {
+                        1 => Player[0].Mark,
+                        2 => Player[1].Mark,
+                        _ => null
+                    };
+
+                    // Xoá highlight của ván trước.
+                    cell.FlatStyle = FlatStyle.Standard;
+                    cell.UseVisualStyleBackColor = true;
+                }
+            }
+        }
+
+        /// <summary>Cho phép hoặc khoá thao tác trên bàn cờ (ví dụ khi chưa tới lượt).</summary>
+        public void SetInteractive(bool enabled)
+        {
+            ChessBoard.Enabled = enabled;
+        }
+
+        /// <summary>Đổi ký hiệu hiển thị bên cạnh tên người chơi.</summary>
+        public void ShowMark(int playerIndex)
+        {
+            PlayerMark.Image = Player[playerIndex].Mark;
         }
         #endregion
 

@@ -8,10 +8,14 @@ namespace Caroclient.UI;
 public sealed class MainMenuForm : Form
 {
     private readonly string playerName;
+    private readonly string password;
+    private readonly string serverAddress;
 
-    public MainMenuForm(string playerName)
+    public MainMenuForm(string playerName, string password = "", string serverAddress = "tcp://localhost:8765")
     {
         this.playerName = playerName;
+        this.password = password;
+        this.serverAddress = serverAddress;
         Text = "Caro - Menu chính";
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(680, 410);
@@ -34,7 +38,7 @@ public sealed class MainMenuForm : Form
     private void OpenGame()
     {
         Hide();
-        using var gameForm = new Form1(playerName);
+        using var gameForm = new Form1(playerName, password, serverAddress);
         gameForm.ShowDialog(this);
         Show();
     }
