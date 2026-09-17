@@ -2,6 +2,8 @@ services:
   server:
     build: ./Server
     container_name: caro-server
+    environment:
+      - RUNNING_IN_DOCKER=true
     ports:
       - "8765:8765"
     env_file:
@@ -21,7 +23,8 @@ services:
       POSTGRES_PASSWORD: caro_pass
       POSTGRES_DB: caro_db
     volumes:
-      - pgdata:/var/lib/postgresql          # ← đổi từ /var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
+      - ./Server/migrations/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "5433:5432"
     healthcheck:

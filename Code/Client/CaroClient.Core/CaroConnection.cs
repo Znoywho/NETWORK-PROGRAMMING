@@ -1,127 +1,272 @@
-using System.Net.WebSockets;
+using System.Buffers.Binary;
+using System.Net.Sockets;
 using System.Text;
 
 namespace CaroClient.Core;
 
+/// <summary>
+/// Kết nối TCP gửi và nhận JSON UTF-8 với header 4 byte biểu thị độ dài payload theo big-endian.
+/// </summary>
 public sealed class CaroConnection : IAsyncDisposable
 {
-    private readonly ClientWebSocket _socket = new();
+    private const int HeaderLength = sizeof(int);
+    private const int MaxMessageLength = 1024 * 1024;
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private readonly SemaphoreSlim _reconnectLock = new(1, 1);
+    private TcpClient? _client;
+    private NetworkStream? _stream;
     private CancellationTokenSource? _receiveLoopCts;
     private Task? _receiveLoopTask;
+    private Uri? _serverUri;
 
-    // event để UI/console đăng ký nghe, mỗi khi có message mới từ server thì báo ra ngoài
     public event Action<string>? MessageReceived;
-
-    // báo khi bị mất kết nối bất ngờ (server tắt, mất mạng...)
     public event Action<string>? Disconnected;
+    public event Action? Reconnected;
 
-    public bool IsConnected => _socket.State == WebSocketState.Open;
+    public bool IsConnected => _client?.Connected == true && _stream is not null;
 
     public async Task ConnectAsync(Uri serverUri, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(serverUri);
-        if (_socket.State != WebSocketState.None)
+        ValidateServerUri(serverUri);
+
+        if (IsConnected)
         {
-            throw new InvalidOperationException("Kết nối này đã mở hoặc đã đóng rồi, tạo CaroConnection mới đi.");
+            throw new InvalidOperationException("Kết nối đã mở.");
         }
 
-        await _socket.ConnectAsync(serverUri, cancellationToken);
+        _serverUri = serverUri;
+        await OpenTransportAsync(serverUri, cancellationToken);
+    }
 
-        _receiveLoopCts = new CancellationTokenSource();
-        _receiveLoopTask = ReceiveLoopAsync(_receiveLoopCts.Token);
+    /// <summary>
+    /// Thử mở lại kết nối tới endpoint gần nhất. Trả về false khi hết số lần thử.
+    /// </summary>
+    public async Task<bool> ReconnectAsync(
+        int maxAttempts = 3,
+        TimeSpan? retryDelay = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (_serverUri is null)
+        {
+            throw new InvalidOperationException("Chưa có endpoint để kết nối lại.");
+        }
+
+        if (maxAttempts < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxAttempts));
+        }
+
+        TimeSpan delay = retryDelay ?? TimeSpan.FromSeconds(2);
+        await _reconnectLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (IsConnected)
+            {
+                return true;
+            }
+
+            CloseTransport();
+
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    await OpenTransportAsync(_serverUri, cancellationToken);
+                    Reconnected?.Invoke();
+                    return true;
+                }
+                catch (Exception) when (attempt < maxAttempts && !cancellationToken.IsCancellationRequested)
+                {
+                    await Task.Delay(delay, cancellationToken);
+                }
+                catch (Exception) when (!cancellationToken.IsCancellationRequested)
+                {
+                    CloseTransport();
+                }
+            }
+
+            return false;
+        }
+        finally
+        {
+            _reconnectLock.Release();
+        }
     }
 
     public async Task SendAsync(string jsonMessage, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(jsonMessage))
+        ArgumentException.ThrowIfNullOrWhiteSpace(jsonMessage);
+
+        TcpClient? client = _client;
+        NetworkStream? stream = _stream;
+        if (!IsConnected || client is null || stream is null)
         {
-            throw new ArgumentException("Không được gửi message rỗng.", nameof(jsonMessage));
+            throw new InvalidOperationException("Chưa kết nối TCP tới server.");
         }
 
-        if (!IsConnected)
+        byte[] payload = Encoding.UTF8.GetBytes(jsonMessage);
+        if (payload.Length > MaxMessageLength)
         {
-            throw new InvalidOperationException("Chưa kết nối server mà đòi gửi message.");
+            throw new ArgumentOutOfRangeException(nameof(jsonMessage), $"Message cannot exceed {MaxMessageLength} bytes.");
         }
-        byte[] data = Encoding.UTF8.GetBytes(jsonMessage);
 
-        await _socket.SendAsync(
-            new ArraySegment<byte>(data),
-            WebSocketMessageType.Text,
-            endOfMessage: true,
-            cancellationToken);
-    }
+        byte[] data = new byte[HeaderLength + payload.Length];
+        BinaryPrimitives.WriteInt32BigEndian(data.AsSpan(0, HeaderLength), payload.Length);
+        payload.CopyTo(data, HeaderLength);
 
-    private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
-    {
-        var buffer = new byte[8192];
-
+        await _sendLock.WaitAsync(cancellationToken);
         try
-        {          
-            while (_socket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
-            {
-                using var messageStream = new MemoryStream();
-                WebSocketReceiveResult result;
-                do
-                {
-                    result = await _socket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
-
-                    if (result.MessageType == WebSocketMessageType.Close)
-                    {
-                        await _socket.CloseAsync(
-                            WebSocketCloseStatus.NormalClosure, "Server yêu cầu đóng", cancellationToken);
-                        Disconnected?.Invoke("Server đã đóng kết nối.");
-                        return;
-                    }
-
-                    messageStream.Write(buffer, 0, result.Count);
-                }
-                while (!result.EndOfMessage);
-
-                string json = Encoding.UTF8.GetString(messageStream.ToArray());
-
-                if (!string.IsNullOrWhiteSpace(json))
-                {
-                    MessageReceived?.Invoke(json);
-                }
-            }
-        }
-        catch (OperationCanceledException)
         {
-            
+            await stream.WriteAsync(data, cancellationToken);
         }
-        catch (WebSocketException ex)
+        catch (Exception ex)
         {
-            // trường hợp này là mất mạng (ví dụ rút dây mạng giữa chừng)
-            Disconnected?.Invoke($"Mất kết nối bất ngờ: {ex.Message}");
+            CloseTransportIfCurrent(client);
+            Disconnected?.Invoke($"Mất kết nối TCP khi gửi dữ liệu: {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            _sendLock.Release();
         }
     }
 
     public async Task DisconnectAsync()
     {
-        _receiveLoopCts?.Cancel();
+        CloseTransport();
 
-        if (_socket.State == WebSocketState.Open)
-        {
-            await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client tự đóng kết nối", CancellationToken.None);
-        }
-
-        if (_receiveLoopTask is not null)
+        Task? receiveLoopTask = _receiveLoopTask;
+        if (receiveLoopTask is not null)
         {
             try
             {
-                await _receiveLoopTask;
+                await receiveLoopTask;
             }
             catch (OperationCanceledException)
             {
-             
+                // Cancellation khi đóng kết nối là bình thường.
             }
+        }
+    }
+
+    private async Task OpenTransportAsync(Uri serverUri, CancellationToken cancellationToken)
+    {
+        var client = new TcpClient();
+        try
+        {
+            int port = serverUri.Port > 0 ? serverUri.Port : 8765;
+            await client.ConnectAsync(serverUri.Host, port, cancellationToken);
+
+            NetworkStream stream = client.GetStream();
+            var receiveLoopCts = new CancellationTokenSource();
+
+            _client = client;
+            _stream = stream;
+            _receiveLoopCts = receiveLoopCts;
+            _receiveLoopTask = ReceiveLoopAsync(client, stream, receiveLoopCts.Token);
+        }
+        catch
+        {
+            client.Dispose();
+            throw;
+        }
+    }
+
+    private async Task ReceiveLoopAsync(TcpClient client, NetworkStream stream, CancellationToken cancellationToken)
+    {
+        byte[] header = new byte[HeaderLength];
+
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested && client.Connected)
+            {
+                if (!await ReadExactlyAsync(stream, header, cancellationToken))
+                {
+                    CloseTransportIfCurrent(client);
+                    Disconnected?.Invoke("Server đã đóng kết nối TCP.");
+                    return;
+                }
+
+                int messageLength = BinaryPrimitives.ReadInt32BigEndian(header);
+                if (messageLength <= 0 || messageLength > MaxMessageLength)
+                {
+                    throw new InvalidDataException($"Độ dài message không hợp lệ: {messageLength} byte.");
+                }
+
+                byte[] payload = new byte[messageLength];
+                if (!await ReadExactlyAsync(stream, payload, cancellationToken))
+                {
+                    CloseTransportIfCurrent(client);
+                    Disconnected?.Invoke("Server đã đóng kết nối TCP khi đang gửi message.");
+                    return;
+                }
+
+                string json = Encoding.UTF8.GetString(payload);
+                MessageReceived?.Invoke(json);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Client chủ động đóng hoặc đang kết nối lại.
+        }
+        catch (Exception ex)
+        {
+            CloseTransportIfCurrent(client);
+            Disconnected?.Invoke($"Mất kết nối TCP bất ngờ: {ex.Message}");
+        }
+    }
+
+    private static async Task<bool> ReadExactlyAsync(NetworkStream stream, byte[] buffer, CancellationToken cancellationToken)
+    {
+        int received = 0;
+        while (received < buffer.Length)
+        {
+            int bytesRead = await stream.ReadAsync(buffer.AsMemory(received), cancellationToken);
+            if (bytesRead == 0)
+            {
+                return false;
+            }
+
+            received += bytesRead;
+        }
+
+        return true;
+    }
+
+    private void CloseTransportIfCurrent(TcpClient client)
+    {
+        if (ReferenceEquals(_client, client))
+        {
+            CloseTransport();
+        }
+    }
+
+    private void CloseTransport()
+    {
+        _receiveLoopCts?.Cancel();
+        _receiveLoopCts?.Dispose();
+        _receiveLoopCts = null;
+
+        _stream?.Dispose();
+        _stream = null;
+
+        _client?.Dispose();
+        _client = null;
+    }
+
+    private static void ValidateServerUri(Uri serverUri)
+    {
+        if (!serverUri.Scheme.Equals("tcp", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Địa chỉ server phải có dạng tcp://host:port.", nameof(serverUri));
         }
     }
 
     public async ValueTask DisposeAsync()
     {
         await DisconnectAsync();
-        _socket.Dispose();
-        _receiveLoopCts?.Dispose();
+        _sendLock.Dispose();
+        _reconnectLock.Dispose();
     }
 }
