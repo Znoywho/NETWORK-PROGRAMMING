@@ -1,10 +1,13 @@
-﻿using CaroClient.Core;
-using System.Text;
+using CaroClient.Core;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
 int connectionLost = 0;
 int reconnecting = 0;
+bool gameEnded = false;
+string? roomId = null;
+string? myPlayerId = null;
+int[][] board = Array.Empty<int[]>();
 
 Console.Write("Địa chỉ server (Enter để dùng mặc định tcp://localhost:8765): ");
 string? uriInput = Console.ReadLine();
@@ -16,20 +19,33 @@ Uri serverUri = string.IsNullOrWhiteSpace(uriInput)
 await using var connection = new CaroConnection();
 var client = new GameClient(connection);
 
+client.OnLoginSucceeded += auth =>
+{
+    myPlayerId = auth.PlayerId;
+    Console.WriteLine();
+    Console.WriteLine($"[login] Đăng nhập thành công: {auth.Username} (ID: {auth.PlayerId})");
+};
+
+client.OnUserCreated += auth =>
+{
+    Console.WriteLine();
+    Console.WriteLine($"[create_user] Đã tạo tài khoản {auth.Username} (ID: {auth.PlayerId}). Hãy /login để đăng nhập.");
+};
+
 client.OnGameStateReceived += state =>
 {
     board = state.Board;
+    roomId = state.RoomId;
 
     Console.WriteLine();
     Console.WriteLine("========================================");
-    Console.WriteLine($"[game_state] matchId={state.MatchId}");
-    Console.WriteLine($"currentPlayerId: {state.CurrentPlayerId}");
+    Console.WriteLine($"[game_state] room_id={state.RoomId}");
+    Console.WriteLine($"currentPlayerId: {state.CurrentPlayerId}"
+        + (state.CurrentPlayerId == myPlayerId ? "  <-- ĐẾN LƯỢT BẠN" : ""));
     Console.WriteLine($"status: {state.Status}");
     Console.WriteLine("========================================");
 
-    // Nếu sau này server trả thêm lastMove, có thể truyền vào đây.
-    // Hiện tại chưa có lastMove, nên truyền null.
-    PrintBoard(board, null);
+    PrintBoard(board);
 };
 
 client.OnGameResultReceived += result =>
@@ -45,13 +61,13 @@ client.OnGameResultReceived += result =>
         _ => $"Kết quả không xác định: {result.Result}"
     };
     Console.WriteLine(text);
-    Console.WriteLine($"Match: {result.MatchId}");
+    Console.WriteLine($"Room: {result.RoomId}");
 
     if (!string.IsNullOrWhiteSpace(result.WinnerId))
     {
         Console.WriteLine($"Người thắng: {result.WinnerId}");
     }
-    
+
     Console.WriteLine("========================================");
     gameEnded = true;
 };
@@ -68,7 +84,8 @@ client.OnOnlinePlayersReceived += onlinePlayers =>
     {
         foreach (PlayerInfo player in onlinePlayers.Players)
         {
-            Console.WriteLine($"- {player.Username} (ID: {player.PlayerId})");
+            string self = player.PlayerId == myPlayerId ? " (bạn)" : "";
+            Console.WriteLine($"- {player.Username} (ID: {player.PlayerId}) [{player.Status}]{self}");
         }
     }
     Console.WriteLine("===================================");
@@ -81,18 +98,28 @@ client.OnInviteReceived += invite =>
     Console.WriteLine($"Gõ /accept {invite.InviteId} để chấp nhận hoặc /reject {invite.InviteId} để từ chối.");
 };
 
-client.OnInviteAccepted += invite =>
+client.OnInviteResult += result =>
 {
-    Console.WriteLine($"[Lời mời] Đã được chấp nhận. Match ID: {invite.MatchId}; X: {invite.PlayerXId}; O: {invite.PlayerOId}.");
+    Console.WriteLine($"[Lời mời] Đã gửi tới {result.ToPlayerId}. Invite ID: {result.InviteId}");
 };
 
-client.OnInviteRejected += invite =>
+client.OnInviteRejected += rejected =>
 {
-    string reason = string.IsNullOrWhiteSpace(invite.Reason) ? "Không có lý do." : invite.Reason;
-    Console.WriteLine($"[Lời mời] Bị từ chối. ID: {invite.InviteId}. Lý do: {reason}");
+    Console.WriteLine($"[Lời mời] Bị từ chối bởi {rejected.ByPlayerId}. Invite ID: {rejected.InviteId}");
 };
 
-connection.MessageReceived += json => Console.WriteLine($"[nhận] {json}");
+client.OnLeaveRoomResult += leave =>
+{
+    roomId = null;
+    Console.WriteLine($"[leave_room] Đã rời phòng với vai trò {leave.Role}."
+        + (string.IsNullOrWhiteSpace(leave.WinnerId) ? "" : $" Người thắng: {leave.WinnerId}"));
+};
+
+client.OnErrorReceived += error =>
+{
+    Console.WriteLine($"[LỖI {error.Code}] {error.Message}");
+};
+
 connection.Disconnected += reason =>
 {
     if (Interlocked.Exchange(ref reconnecting, 1) == 1)
@@ -127,12 +154,13 @@ connection.Disconnected += reason =>
     });
 };
 
-connection.Reconnected += () => Console.WriteLine("[KẾT NỐI LẠI] Đã kết nối lại TCP thành công.");
+connection.Reconnected += () =>
+    Console.WriteLine("[KẾT NỐI LẠI] Đã kết nối lại TCP thành công. Hãy /login lại.");
 
 try
 {
-    await connection.ConnectAsync(new Uri(serverAddress));
-    Console.WriteLine($"Đã kết nối tới {serverAddress}");
+    await connection.ConnectAsync(serverUri);
+    Console.WriteLine($"Đã kết nối tới {serverUri}");
 }
 catch (Exception ex)
 {
@@ -141,22 +169,24 @@ catch (Exception ex)
 }
 
 Console.Write("Username: ");
-string username = Console.ReadLine() ?? "player1";
+string username = (Console.ReadLine() ?? "").Trim();
 
-Console.Write("PlayerId: ");
-string playerId = Console.ReadLine() ?? "p1";
+Console.Write("Password: ");
+string password = Console.ReadLine() ?? "";
 
-while (Volatile.Read(ref connectionLost) == 0)
+try
+{
+    await client.LoginAsync(username, password);
+}
+catch (Exception ex)
 {
     Console.WriteLine($"Login lỗi: {ex.Message}");
     return;
 }
 
-Console.WriteLine("Nhập nước đi theo dạng: row col");
-Console.WriteLine("Ví dụ: 2 3");
 PrintHelp();
 
-while (!gameEnded)
+while (!gameEnded && Volatile.Read(ref connectionLost) == 0)
 {
     Console.Write("Nước đi/lệnh: ");
     string? input = Console.ReadLine();
@@ -172,7 +202,18 @@ while (!gameEnded)
         continue;
     }
 
-    if (input is null || input.Trim().Equals("/quit", StringComparison.OrdinalIgnoreCase))
+    if (input is null)
+    {
+        break;
+    }
+
+    string command = input.Trim();
+    if (command.Length == 0)
+    {
+        continue;
+    }
+
+    if (command.Equals("/quit", StringComparison.OrdinalIgnoreCase))
     {
         break;
     }
@@ -183,71 +224,26 @@ while (!gameEnded)
         continue;
     }
 
-    if (command.Equals("/online", StringComparison.OrdinalIgnoreCase))
+    if (command.Equals("/board", StringComparison.OrdinalIgnoreCase))
     {
-        await client.GetOnlinePlayersAsync();
-        continue;
-    }
-
-    string[] commandParts = command.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-    if (commandParts[0].Equals("/invite", StringComparison.OrdinalIgnoreCase))
-    {
-        if (commandParts.Length < 2)
-        {
-            Console.WriteLine("Cú pháp: /invite <playerId>");
-            continue;
-        }
-
-        await client.SendInviteAsync(commandParts[1], Guid.NewGuid().ToString("N"));
-        Console.WriteLine($"Đã gửi lời mời đến {commandParts[1]}.");
-        continue;
-    }
-
-    if (commandParts[0].Equals("/accept", StringComparison.OrdinalIgnoreCase))
-    {
-        if (commandParts.Length < 2)
-        {
-            Console.WriteLine("Cú pháp: /accept <inviteId>");
-            continue;
-        }
-
-        await client.AcceptInviteAsync(commandParts[1]);
-        continue;
-    }
-
-    if (commandParts[0].Equals("/reject", StringComparison.OrdinalIgnoreCase))
-    {
-        if (commandParts.Length < 2)
-        {
-            Console.WriteLine("Cú pháp: /reject <inviteId> [lý do]");
-            continue;
-        }
-
-        string? reason = commandParts.Length == 3 ? commandParts[2] : null;
-        await client.RejectInviteAsync(commandParts[1], reason);
-        continue;
-    }
-
-    if (!TryParseMove(input, out int row, out int col))
-    {
-        Console.WriteLine("Sai định dạng. Hãy nhập theo ví dụ: 2 3");
-        continue;
-    }
-
-    if (row < 0 || col < 0)
-    {
-        Console.WriteLine("Tọa độ phải >= 0.");
+        PrintBoard(board);
         continue;
     }
 
     try
     {
-        await client.MakeMoveAsync(matchId, playerId, row, col);
-        Console.WriteLine($"Đã gửi nước đi: ({row}, {col})");
+        if (command.StartsWith('/'))
+        {
+            await HandleCommandAsync(command);
+        }
+        else
+        {
+            await HandleMoveAsync(command);
+        }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Gửi nước đi lỗi: {ex.Message}");
+        Console.WriteLine($"Gửi lệnh lỗi: {ex.Message}");
     }
 }
 
@@ -255,3 +251,194 @@ await connection.DisconnectAsync();
 Console.WriteLine(Volatile.Read(ref connectionLost) == 1
     ? "Phiên làm việc đã kết thúc do mất kết nối."
     : "Đã đóng kết nối.");
+
+async Task HandleCommandAsync(string command)
+{
+    string[] parts = command.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    string verb = parts[0];
+
+    if (verb.Equals("/online", StringComparison.OrdinalIgnoreCase))
+    {
+        await client.GetOnlinePlayersAsync();
+        return;
+    }
+
+    if (verb.Equals("/register", StringComparison.OrdinalIgnoreCase))
+    {
+        if (parts.Length < 3)
+        {
+            Console.WriteLine("Cú pháp: /register <username> <password>  (mật khẩu tối thiểu 10 ký tự)");
+            return;
+        }
+
+        await client.CreateUserAsync(parts[1], parts[2]);
+        return;
+    }
+
+    if (verb.Equals("/login", StringComparison.OrdinalIgnoreCase))
+    {
+        if (parts.Length < 3)
+        {
+            Console.WriteLine("Cú pháp: /login <username> <password>");
+            return;
+        }
+
+        await client.LoginAsync(parts[1], parts[2]);
+        return;
+    }
+
+    if (verb.Equals("/invite", StringComparison.OrdinalIgnoreCase))
+    {
+        if (parts.Length < 2)
+        {
+            Console.WriteLine("Cú pháp: /invite <playerId> [inviteId]");
+            return;
+        }
+
+        string inviteId = parts.Length >= 3 ? parts[2] : Guid.NewGuid().ToString("N");
+        await client.SendInviteAsync(parts[1], inviteId);
+        return;
+    }
+
+    if (verb.Equals("/accept", StringComparison.OrdinalIgnoreCase))
+    {
+        if (parts.Length < 2)
+        {
+            Console.WriteLine("Cú pháp: /accept <inviteId>");
+            return;
+        }
+
+        await client.AcceptInviteAsync(parts[1]);
+        return;
+    }
+
+    if (verb.Equals("/reject", StringComparison.OrdinalIgnoreCase))
+    {
+        if (parts.Length < 2)
+        {
+            Console.WriteLine("Cú pháp: /reject <inviteId> [lý do]");
+            return;
+        }
+
+        await client.RejectInviteAsync(parts[1], parts.Length == 3 ? parts[2] : null);
+        return;
+    }
+
+    if (verb.Equals("/spectate", StringComparison.OrdinalIgnoreCase))
+    {
+        if (parts.Length < 2)
+        {
+            Console.WriteLine("Cú pháp: /spectate <room_id>");
+            return;
+        }
+
+        await client.SpectateAsync(parts[1]);
+        return;
+    }
+
+    if (verb.Equals("/leave", StringComparison.OrdinalIgnoreCase))
+    {
+        string? target = parts.Length >= 2 ? parts[1] : roomId;
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            Console.WriteLine("Chưa ở trong phòng nào. Cú pháp: /leave [room_id]");
+            return;
+        }
+
+        await client.LeaveRoomAsync(target);
+        return;
+    }
+
+    Console.WriteLine($"Lệnh không hợp lệ: {verb}. Gõ /help để xem danh sách.");
+}
+
+async Task HandleMoveAsync(string input)
+{
+    if (!TryParseMove(input, out int row, out int col))
+    {
+        Console.WriteLine("Sai định dạng. Hãy nhập theo ví dụ: 2 3");
+        return;
+    }
+
+    if (string.IsNullOrWhiteSpace(roomId))
+    {
+        Console.WriteLine("Chưa vào phòng nào. Hãy /invite hoặc /accept trước.");
+        return;
+    }
+
+    if (string.IsNullOrWhiteSpace(myPlayerId))
+    {
+        Console.WriteLine("Chưa đăng nhập. Hãy /login <username> <password>.");
+        return;
+    }
+
+    await client.MakeMoveAsync(roomId, myPlayerId, row, col);
+    Console.WriteLine($"Đã gửi nước đi: ({row}, {col})");
+}
+
+static bool TryParseMove(string input, out int row, out int col)
+{
+    row = 0;
+    col = 0;
+
+    string[] parts = input.Split(
+        new[] { ' ', ',', '\t' },
+        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    return parts.Length == 2
+        && int.TryParse(parts[0], out row)
+        && int.TryParse(parts[1], out col)
+        && row >= 0
+        && col >= 0;
+}
+
+static void PrintHelp()
+{
+    Console.WriteLine();
+    Console.WriteLine("===== LỆNH =====");
+    Console.WriteLine("  <row> <col>                  Đánh một nước, ví dụ: 7 7");
+    Console.WriteLine("  /online                      Xem danh sách người chơi online");
+    Console.WriteLine("  /invite <playerId> [id]      Mời một người chơi");
+    Console.WriteLine("  /accept <inviteId>           Chấp nhận lời mời");
+    Console.WriteLine("  /reject <inviteId> [lý do]   Từ chối lời mời");
+    Console.WriteLine("  /spectate <room_id>          Xem một trận đang diễn ra");
+    Console.WriteLine("  /leave [room_id]             Rời phòng hiện tại");
+    Console.WriteLine("  /login <user> <pass>         Đăng nhập lại");
+    Console.WriteLine("  /register <user> <pass>      Tạo tài khoản mới (pass >= 10 ký tự)");
+    Console.WriteLine("  /board                       In lại bàn cờ");
+    Console.WriteLine("  /help                        Xem trợ giúp");
+    Console.WriteLine("  /quit                        Thoát");
+    Console.WriteLine("================");
+}
+
+static void PrintBoard(int[][] board)
+{
+    if (board.Length == 0)
+    {
+        Console.WriteLine("(chưa có bàn cờ)");
+        return;
+    }
+
+    Console.Write("    ");
+    for (int c = 0; c < board[0].Length; c++)
+    {
+        Console.Write($"{c,2} ");
+    }
+    Console.WriteLine();
+
+    for (int r = 0; r < board.Length; r++)
+    {
+        Console.Write($"{r,3} ");
+        for (int c = 0; c < board[r].Length; c++)
+        {
+            char symbol = board[r][c] switch
+            {
+                1 => 'X',
+                2 => 'O',
+                _ => '.'
+            };
+            Console.Write($" {symbol} ");
+        }
+        Console.WriteLine();
+    }
+}
