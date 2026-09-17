@@ -5,22 +5,36 @@ namespace Caroclient.UI;
 public partial class LoginForm : Form
 {
     public string Username { get; private set; } = string.Empty;
+    public string Password { get; private set; } = string.Empty;
     public string ServerAddress { get; private set; } = string.Empty;
 
     public LoginForm()
     {
         InitializeComponent();
+
+        if (string.IsNullOrWhiteSpace(txtServerAddress.Text))
+        {
+            txtServerAddress.Text = "tcp://localhost:8765";
+        }
     }
 
     private void btnLogin_Click(object? sender, EventArgs e)
     {
         string username = txtLoginUsername.Text.Trim();
+        string password = txtPassword.Text;
         string serverAddress = txtServerAddress.Text.Trim();
 
         if (string.IsNullOrWhiteSpace(username))
         {
             MessageBox.Show("Vui lòng nhập tên người chơi.", "Thiếu thông tin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             txtLoginUsername.Focus();
+            return;
+        }
+
+        if (string.IsNullOrEmpty(password))
+        {
+            MessageBox.Show("Vui lòng nhập mật khẩu.", "Thiếu thông tin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            txtPassword.Focus();
             return;
         }
 
@@ -33,6 +47,7 @@ public partial class LoginForm : Form
         }
 
         Username = username;
+        Password = password;
         ServerAddress = serverAddress;
         DialogResult = DialogResult.OK;
         Close();
