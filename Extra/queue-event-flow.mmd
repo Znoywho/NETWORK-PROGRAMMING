@@ -1,0 +1,36 @@
+%% ============================================================
+%%  Mo ta dung luong trong:
+%%    Code/Server/app/queue/db_queue.py
+%%    Code/Server/app/queue/db_writer.py
+%% ============================================================
+
+flowchart TB
+
+    subgraph vonglap["Luong chinh - vong lap selectors (app/network/server.py)"]
+        direction LR
+        H1["Handler<br/>make_move"]
+        H2["Handler<br/>ket thuc van"]
+    end
+
+    Q(["DBQueue<br/>queue.Queue - thread-safe"])
+
+    subgraph writer["Thread db-writer (chay song song, 1 thread duy nhat)"]
+        W["Vong lap<br/>get timeout 0.5s"]
+        R{"Ghi thanh cong?"}
+        L["Phan loai loi"]
+    end
+
+    DB[("PostgreSQL")]
+    DL["logs/db_failed.jsonl<br/>dead-letter"]
+
+    H1 -->|"put INSERT_MOVE"| Q
+    H2 -->|"put UPDATE_MATCH_RESULT"| Q
+
+    Q --> W
+    W --> R
+    R -->|"co"| DB
+    R -->|"khong"| L
+
+    L -->|"IntegrityError<br/>du lieu sai, thu lai vo ich"| DL
+    L -->|"OperationalError<br/>thu lai 3 lan, cho 0.5s 1s 2s"| W
+    L -->|"het 3 lan"| DL
