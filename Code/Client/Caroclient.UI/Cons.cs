@@ -10,7 +10,7 @@ namespace Caroclient.UI
         public static int CHESS_WIDTH = 30;
         public static int CHESS_HEIGHT = 30;
 
-        public static int CHESS_BOARD_WIDTH = 20;
-        public static int CHESS_BOARD_HEIGHT = 20;
+        public static int CHESS_BOARD_WIDTH = 15;
+        public static int CHESS_BOARD_HEIGHT = 15;
     }
 }
