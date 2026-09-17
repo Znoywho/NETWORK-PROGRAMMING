@@ -1,0 +1,50 @@
+%% ============================================================
+%%
+%%  Mo ta dung cau truc trong Code/Server/migrations/init.sql
+%%  Xem ban render: mo file nay tren GitHub, hoac dan vao mermaid.live
+%%
+%%  Cap nhat: khoa chinh dung BIGSERIAL (so tang dan) thay vi UUID
+%%  de don gian hoa khi chay local.
+%% ============================================================
+
+erDiagram
+
+    users ||--o{ matches : "la player_x"
+    users ||--o{ matches : "la player_o"
+    users |o--o{ matches : "la winner"
+    users ||--o{ moves   : "thuc hien"
+    matches ||--o{ moves : "gom cac"
+
+    users {
+        bigserial   id            PK "so tang dan do Postgres cap"
+        varchar     username      UK "32 ky tu, toi thieu 3"
+        varchar     password_hash    "255, cho phep NULL"
+        int         ranking          "mac dinh 0"
+        timestamptz created_at       "mac dinh now()"
+        timestamptz last_login_at    "cho phep NULL"
+    }
+
+    matches {
+        bigserial   id            PK "so tang dan"
+        bigint      player_x_id   FK "khong duoc trung player_o_id"
+        bigint      player_o_id   FK "ON DELETE RESTRICT"
+        varchar     status           "waiting|playing|finished|aborted"
+        varchar     result           "x_win|o_win|draw|aborted"
+        bigint      winner_id     FK "NULL neu hoa hoac chua ket thuc"
+        smallint    board_rows       "mac dinh 15"
+        smallint    board_cols       "mac dinh 15"
+        smallint    win_condition    "mac dinh 5 quan lien tiep"
+        timestamptz created_at       "mac dinh now()"
+        timestamptz started_at       "NULL khi con waiting"
+        timestamptz ended_at         "NULL khi chua ket thuc"
+    }
+
+    moves {
+        bigserial   id            PK "so tang dan"
+        bigint      match_id      FK "ON DELETE CASCADE"
+        bigint      player_id     FK "ON DELETE RESTRICT"
+        smallint    row_idx          "toa do dong, >= 0"
+        smallint    col_idx          "toa do cot, >= 0"
+        integer     move_index       "thu tu nuoc di, bat dau tu 1"
+        timestamptz created_at       "mac dinh now()"
+    }
