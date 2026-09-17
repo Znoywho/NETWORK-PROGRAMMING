@@ -70,7 +70,6 @@ namespace Caroclient.UI
 
             Matrix = new List<List<Button>>();
 
-            Button oldButton = new Button() { Width = 0, Location = new Point(0, 0) }; //Canh chuẩn kích thước trái phải
             for (int i = 0; i < Cons.CHESS_BOARD_HEIGHT; i++)
             {
                 Matrix.Add(new List<Button>());
@@ -81,7 +80,7 @@ namespace Caroclient.UI
                     {
                         Width = Cons.CHESS_WIDTH,
                         Height = Cons.CHESS_HEIGHT,
-                        Location = new Point(oldButton.Location.X + oldButton.Width, oldButton.Location.Y),
+                        Location = new Point(j * Cons.CHESS_WIDTH, i * Cons.CHESS_HEIGHT),
                         BackgroundImageLayout = ImageLayout.Stretch,
                         Tag = i.ToString() //Xac dinh
                     };
@@ -91,12 +90,7 @@ namespace Caroclient.UI
                     ChessBoard.Controls.Add(btn);
 
                     Matrix[i].Add(btn);
-
-                    oldButton = btn;
                 }
-                oldButton.Location = new Point(0, oldButton.Location.Y + Cons.CHESS_HEIGHT);
-                oldButton.Width = 0;
-                oldButton.Height = 0;
             }
 
             ChangePlayer();

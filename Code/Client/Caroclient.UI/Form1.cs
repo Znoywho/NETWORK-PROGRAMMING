@@ -22,6 +22,8 @@ namespace Caroclient.UI
         private string? pendingInviteId;
         private string? pendingInviteFrom;
         private bool isSpectator;
+        private bool dangXinXemTran;   // đã gửi spectate, chờ server xác nhận
+        private bool dangChoXacNhanNuocDi;
         private int PlayerOneWins;
         private int PlayerTwoWins;
         #endregion
@@ -252,15 +254,12 @@ namespace Caroclient.UI
                     MessageBox.Show(error.Message, "Không đăng nhập được", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
 
-                // Xin xem trận thất bại thì không được kẹt ở chế độ khán giả.
-                if (error.Code is "ROOM_NOT_FOUND" or "INVALID_SPECTATE" or "PLAYER_BUSY")
-                {
-                    isSpectator = false;
-                }
+                // Bất kỳ lỗi nào cũng huỷ yêu cầu đang chờ, khỏi phải liệt kê mã lỗi.
+                dangXinXemTran = false;
 
-                // Server từ chối nước đi thì trả lại quyền bấm cho người chơi.
-                if (roomId is not null && error.Code is "NOT_YOUR_TURN" or "CELL_OCCUPIED" or "MOVE_OUT_OF_BOUNDS")
+                if (dangChoXacNhanNuocDi)
                 {
+                    dangChoXacNhanNuocDi = false;
                     ChessBoard.SetInteractive(true);
                 }
             });
@@ -277,6 +276,13 @@ namespace Caroclient.UI
 
         private void ApplyGameState(GameStateMessage state)
         {
+            if (dangXinXemTran)
+            {
+                isSpectator = true;
+                dangXinXemTran = false;
+            }
+
+            dangChoXacNhanNuocDi = false;
             roomId = state.RoomId;
             ChessBoard.RenderBoard(state.Board);
 
@@ -343,6 +349,7 @@ namespace Caroclient.UI
 
             // Khoá bàn cờ cho tới khi server xác nhận bằng game_state mới.
             ChessBoard.SetInteractive(false);
+            dangChoXacNhanNuocDi = true;
             await SafeSendAsync(client.MakeMoveAsync(roomId, myPlayerId, row, col));
         }
 
@@ -371,7 +378,7 @@ namespace Caroclient.UI
                 return;
             }
 
-            isSpectator = true;
+            dangXinXemTran = true;
             await SafeSendAsync(client.SpectateAsync(room));
         }
 
@@ -413,6 +420,7 @@ namespace Caroclient.UI
             if (accept)
             {
                 isSpectator = false;
+                dangXinXemTran = false;
                 await SafeSendAsync(client.AcceptInviteAsync(inviteId));
             }
             else
@@ -637,7 +645,7 @@ namespace Caroclient.UI
             Quit();
         }
 
-        private async void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             if (MessageBox.Show("Bạn có chắc muốn thoát?", "Thông báo", MessageBoxButtons.OKCancel) != DialogResult.OK)
             {
@@ -647,7 +655,9 @@ namespace Caroclient.UI
 
             try
             {
-                await connection.DisconnectAsync();
+                // Chờ có giới hạn: async void ở đây sẽ để form đóng trước khi
+                // kết nối kịp đóng sạch.
+                connection.DisconnectAsync().Wait(TimeSpan.FromSeconds(2));
             }
             catch (Exception)
             {

@@ -2,9 +2,11 @@ using CaroClient.Core;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
+// Các biến dưới đây bị ghi từ luồng nhận message và đọc ở vòng lặp chính,
+// nên luôn truy cập qua Volatile giống connectionLost/reconnecting.
 int connectionLost = 0;
 int reconnecting = 0;
-bool gameEnded = false;
+int gameEnded = 0;
 string? roomId = null;
 string? myPlayerId = null;
 int[][] board = Array.Empty<int[]>();
@@ -21,7 +23,7 @@ var client = new GameClient(connection);
 
 client.OnLoginSucceeded += auth =>
 {
-    myPlayerId = auth.PlayerId;
+    Volatile.Write(ref myPlayerId, auth.PlayerId);
     Console.WriteLine();
     Console.WriteLine($"[login] Đăng nhập thành công: {auth.Username} (ID: {auth.PlayerId})");
 };
@@ -34,14 +36,14 @@ client.OnUserCreated += auth =>
 
 client.OnGameStateReceived += state =>
 {
-    board = state.Board;
-    roomId = state.RoomId;
+    Volatile.Write(ref board, state.Board);
+    Volatile.Write(ref roomId, state.RoomId);
 
     Console.WriteLine();
     Console.WriteLine("========================================");
     Console.WriteLine($"[game_state] room_id={state.RoomId}");
     Console.WriteLine($"currentPlayerId: {state.CurrentPlayerId}"
-        + (state.CurrentPlayerId == myPlayerId ? "  <-- ĐẾN LƯỢT BẠN" : ""));
+        + (state.CurrentPlayerId == Volatile.Read(ref myPlayerId) ? "  <-- ĐẾN LƯỢT BẠN" : ""));
     Console.WriteLine($"status: {state.Status}");
     Console.WriteLine("========================================");
 
@@ -69,7 +71,7 @@ client.OnGameResultReceived += result =>
     }
 
     Console.WriteLine("========================================");
-    gameEnded = true;
+    Volatile.Write(ref gameEnded, 1);
 };
 
 client.OnOnlinePlayersReceived += onlinePlayers =>
@@ -84,7 +86,7 @@ client.OnOnlinePlayersReceived += onlinePlayers =>
     {
         foreach (PlayerInfo player in onlinePlayers.Players)
         {
-            string self = player.PlayerId == myPlayerId ? " (bạn)" : "";
+            string self = player.PlayerId == Volatile.Read(ref myPlayerId) ? " (bạn)" : "";
             Console.WriteLine($"- {player.Username} (ID: {player.PlayerId}) [{player.Status}]{self}");
         }
     }
@@ -110,7 +112,7 @@ client.OnInviteRejected += rejected =>
 
 client.OnLeaveRoomResult += leave =>
 {
-    roomId = null;
+    Volatile.Write(ref roomId, null);
     Console.WriteLine($"[leave_room] Đã rời phòng với vai trò {leave.Role}."
         + (string.IsNullOrWhiteSpace(leave.WinnerId) ? "" : $" Người thắng: {leave.WinnerId}"));
 };
@@ -186,7 +188,7 @@ catch (Exception ex)
 
 PrintHelp();
 
-while (!gameEnded && Volatile.Read(ref connectionLost) == 0)
+while (Volatile.Read(ref gameEnded) == 0 && Volatile.Read(ref connectionLost) == 0)
 {
     Console.Write("Nước đi/lệnh: ");
     string? input = Console.ReadLine();
@@ -226,7 +228,7 @@ while (!gameEnded && Volatile.Read(ref connectionLost) == 0)
 
     if (command.Equals("/board", StringComparison.OrdinalIgnoreCase))
     {
-        PrintBoard(board);
+        PrintBoard(Volatile.Read(ref board));
         continue;
     }
 
@@ -338,7 +340,7 @@ async Task HandleCommandAsync(string command)
 
     if (verb.Equals("/leave", StringComparison.OrdinalIgnoreCase))
     {
-        string? target = parts.Length >= 2 ? parts[1] : roomId;
+        string? target = parts.Length >= 2 ? parts[1] : Volatile.Read(ref roomId);
         if (string.IsNullOrWhiteSpace(target))
         {
             Console.WriteLine("Chưa ở trong phòng nào. Cú pháp: /leave [room_id]");
@@ -360,19 +362,21 @@ async Task HandleMoveAsync(string input)
         return;
     }
 
-    if (string.IsNullOrWhiteSpace(roomId))
+    string? currentRoomId = Volatile.Read(ref roomId);
+    if (string.IsNullOrWhiteSpace(currentRoomId))
     {
         Console.WriteLine("Chưa vào phòng nào. Hãy /invite hoặc /accept trước.");
         return;
     }
 
-    if (string.IsNullOrWhiteSpace(myPlayerId))
+    string? currentPlayerId = Volatile.Read(ref myPlayerId);
+    if (string.IsNullOrWhiteSpace(currentPlayerId))
     {
         Console.WriteLine("Chưa đăng nhập. Hãy /login <username> <password>.");
         return;
     }
 
-    await client.MakeMoveAsync(roomId, myPlayerId, row, col);
+    await client.MakeMoveAsync(currentRoomId, currentPlayerId, row, col);
     Console.WriteLine($"Đã gửi nước đi: ({row}, {col})");
 }
 
