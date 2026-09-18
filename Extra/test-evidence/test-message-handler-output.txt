@@ -1,0 +1,22 @@
+Ket qua chay: python -m unittest tests.test_message_handler -v
+Ngay chay: 2026-09-18
+Bo test nay chay bang fake session + fake clock, khong can database that.
+
+test_disconnect_holds_the_room_and_pauses_the_clock (tests.test_message_handler.MessageHandlerTest.test_disconnect_holds_the_room_and_pauses_the_clock) ... ok
+test_each_move_refills_the_thinking_clock (tests.test_message_handler.MessageHandlerTest.test_each_move_refills_the_thinking_clock) ... ok
+test_login_replies_to_origin_and_broadcasts_online_players (tests.test_message_handler.MessageHandlerTest.test_login_replies_to_origin_and_broadcasts_online_players) ... ok
+test_match_list_only_shows_matches_in_progress (tests.test_message_handler.MessageHandlerTest.test_match_list_only_shows_matches_in_progress) ... ok
+test_move_cannot_impersonate_another_player (tests.test_message_handler.MessageHandlerTest.test_move_cannot_impersonate_another_player) ... ok
+test_only_invited_player_can_accept_and_room_starts_playing (tests.test_message_handler.MessageHandlerTest.test_only_invited_player_can_accept_and_room_starts_playing) ... ok
+test_player_reconnects_in_time_and_keeps_playing (tests.test_message_handler.MessageHandlerTest.test_player_reconnects_in_time_and_keeps_playing) ... ok
+test_reconnect_deadline_expires_and_opponent_wins (tests.test_message_handler.MessageHandlerTest.test_reconnect_deadline_expires_and_opponent_wins) ... ok
+test_server_delivery_routes_origin_targeted_and_broadcast_messages (tests.test_message_handler.MessageHandlerTest.test_server_delivery_routes_origin_targeted_and_broadcast_messages) ... ok
+test_spectator_cannot_make_move (tests.test_message_handler.MessageHandlerTest.test_spectator_cannot_make_move) ... ok
+test_spectator_joins_room_and_receives_game_state (tests.test_message_handler.MessageHandlerTest.test_spectator_joins_room_and_receives_game_state) ... ok
+test_turn_timeout_awards_the_win_to_the_opponent (tests.test_message_handler.MessageHandlerTest.test_turn_timeout_awards_the_win_to_the_opponent) ... ok
+test_winning_move_sends_personal_win_and_lose_results (tests.test_message_handler.MessageHandlerTest.test_winning_move_sends_personal_win_and_lose_results) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 20.505s
+
+OK

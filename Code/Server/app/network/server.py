@@ -14,6 +14,10 @@ from app.db import SessionLocal
 
 logger = logging.getLogger(__name__)
 
+# Vong lap khong con cho vo han: cu moi nhip nay no thuc day mot lan de
+# doi chieu dong ho cua cac phong (het gio suy nghi, het han ket noi lai).
+TICK_INTERVAL_SECONDS = 1.0
+
 class ServerHandler:
 
     def __init__(self, host: str, port: int) -> None:
@@ -68,7 +72,7 @@ class ServerHandler:
         self._dispatch(deliveries, conn)
         conn.close()
 
-    def _dispatch(self, deliveries: list[dict], sender: Connection) -> None:
+    def _dispatch(self, deliveries: list[dict], sender: Connection | None = None) -> None:
         for delivery in deliveries:
             targets = delivery["targets"]
             payload = delivery["payload"]
@@ -81,8 +85,11 @@ class ServerHandler:
                         player.connection.send(payload)
 
             elif len(targets) == 0:
-                # Reply only to the socket that sent the request
-                sender.send(payload)
+                # Reply only to the socket that sent the request. Message do
+                # dong ho sinh ra khong co socket goc nen khong bao gio roi
+                # vao nhanh nay.
+                if sender is not None:
+                    sender.send(payload)
 
             else:
                 # Send to specific player IDs
@@ -106,7 +113,7 @@ class ServerHandler:
 
         try:
             while True:
-                events = self.sel.select(timeout=None)
+                events = self.sel.select(timeout=TICK_INTERVAL_SECONDS)
                 for key, mask in events:
                     if key.data is None:
                         # Listener socket — accept new connection
@@ -114,6 +121,10 @@ class ServerHandler:
                     else:
                         # Client connection — read / write
                         self._handle_client(key.data, mask)
+
+                # Het gio suy nghi / het han ket noi lai: khong client nao
+                # gui gi len, nen chi cho nay phat hien duoc.
+                self._dispatch(self.message_handler.tick())
         except KeyboardInterrupt:
             print("\nServer shutting down.")
         finally:

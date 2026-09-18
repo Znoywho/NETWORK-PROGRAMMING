@@ -92,6 +92,7 @@ Client gửi lên server:
 - `online_players`: xin danh sách người chơi đang online.
 - `invite`, `accept_invite`, `reject_invite`: mời đấu và trả lời lời mời.
 - `make_move`: đánh một nước cờ.
+- `match_list`: xin danh sách các trận đang diễn ra.
 - `spectate`: vào xem một trận đấu.
 - `leave_room`: rời phòng.
 
@@ -100,10 +101,21 @@ Server gửi về client:
 - `login`, `create_user`: kết quả đăng nhập / đăng ký kèm `playerId`.
 - `online_players`: danh sách online (server tự broadcast mỗi khi danh sách đổi).
 - `invite`: báo cho người được mời. `invite_result`, `invite_rejected`, `reject_invite_result`: kết quả lời mời.
-- `game_state`: trạng thái bàn cờ hiện tại.
-- `game_result`: thắng, thua hoặc hòa.
+- `game_state`: trạng thái bàn cờ hiện tại, kèm thời gian còn lại của lượt.
+- `game_result`: thắng, thua hoặc hòa, kèm lý do khi ván kết thúc vì hết giờ, mất kết nối hoặc bỏ trận.
+- `match_list`: danh sách trận đang diễn ra để chọn phòng khán giả.
+- `player_disconnected`, `player_reconnected`: một bên rớt mạng giữa trận và quay lại.
 - `leave_room_result`: kết quả rời phòng.
 - `error`: message không hợp lệ hoặc hành động bị từ chối.
+
+### Luật thời gian
+
+| Mốc | Giá trị | Hết hạn thì sao |
+|---|---|---|
+| Thời gian suy nghĩ mỗi lượt | 30 giây | Người đang tới lượt bị xử thua |
+| Thời gian được phép kết nối lại | 60 giây | Đối thủ được xử thắng |
+
+Trong lúc chờ một người kết nối lại, đồng hồ suy nghĩ tạm dừng; người quay lại kịp hạn được cấp trọn vẹn một lượt mới. Hai hằng số nằm ở đầu `Code/Server/app/handlers/message_handlers.py`.
 
 Schema đầy đủ của từng message ở `Code/Shared/message-schema.json`. Giải thích chi tiết cách đóng khung và cách server chọn người nhận ở `Extra/network-protocol.md`.
 
@@ -223,9 +235,9 @@ Thông tin database khai trong `docker-compose.yml` (mục `db.environment`):
 - [x] Lưu lịch sử và kết quả trận đấu.
 - [x] Cho phép khán giả xem trận đấu đang diễn ra.
 - [x] Phân biệt quyền của người chơi và khán giả.
-- [ ] Giới hạn thời gian suy nghĩ cho mỗi lượt.
-- [ ] Cho phép người chơi kết nối lại trong thời gian cho phép.
-- [ ] Xem danh sách các trận đang diễn ra để chọn phòng khán giả.
+- [x] Giới hạn thời gian suy nghĩ cho mỗi lượt.
+- [x] Cho phép người chơi kết nối lại trong thời gian cho phép.
+- [x] Xem danh sách các trận đang diễn ra để chọn phòng khán giả.
 
 ## Kiểm thử
 
@@ -269,9 +281,9 @@ Bằng chứng kiểm thử, hình ảnh, video demo và log lưu tại `Extra/`
 
 ## Giới hạn hiện tại
 
-- Chưa có giới hạn thời gian mỗi lượt và chưa cho phép kết nối lại: người chơi rớt mạng giữa trận thì đối thủ được xử thắng ngay.
-- Chưa có message cho client lấy danh sách phòng đang chơi, nên muốn xem trận phải biết trước `room_id`.
-- Chưa chặn trần độ dài frame và chưa có heartbeat — xem mục "Giới hạn hiện tại" trong `Extra/network-protocol.md`.
+- Chưa chặn trần độ dài frame và chưa có heartbeat: client rút dây mạng đột ngột thì server chỉ biết khi TCP tự phát hiện, nên đồng hồ 60 giây chờ kết nối lại bắt đầu muộn hơn thực tế — xem mục "Giới hạn hiện tại" trong `Extra/network-protocol.md`.
+- Kết nối lại nghĩa là đăng nhập lại bằng username/password, chưa có session token.
+- Thua vì hết giờ hoặc vì bỏ trận không tính vào điểm ranking (chỉ ván kết thúc trên bàn cờ mới tính).
 - Model `User` trong `app/models/user.py` lệch kiểu thời gian so với `migrations/init.sql`.
 - Chưa có công cụ migration: đổi schema phải xoá volume và tạo lại database từ đầu.
 - Test còn ít và phần lớn viết dạng script, chưa gom về một bộ chạy chung.

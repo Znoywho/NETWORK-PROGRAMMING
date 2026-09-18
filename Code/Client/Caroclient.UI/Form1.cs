@@ -23,7 +23,15 @@ namespace Caroclient.UI
         private string? pendingInviteFrom;
         private bool isSpectator;
         private bool dangXinXemTran;   // đã gửi spectate, chờ server xác nhận
+        private bool dangChonTranDeXem; // đã xin match_list để mở bảng chọn phòng
         private bool dangChoXacNhanNuocDi;
+
+        // Đồng hồ hiển thị: server gửi số giây còn lại trong game_state, client
+        // chỉ đếm ngược tại chỗ nên không cần server bắn message mỗi giây.
+        private readonly System.Windows.Forms.Timer turnClockTimer = new() { Interval = 1000 };
+        private int turnSecondsLeft;
+        private int reconnectSecondsLeft;
+        private string? waitingForPlayerId;
         private int PlayerOneWins;
         private int PlayerTwoWins;
         #endregion
@@ -53,6 +61,8 @@ namespace Caroclient.UI
             ChessBoard.DrawChessBoard();
             ChessBoard.SetInteractive(false);
 
+            turnClockTimer.Tick += TurnClockTick;
+
             client = new GameClient(connection);
             RegisterClientEvents();
         }
@@ -67,6 +77,16 @@ namespace Caroclient.UI
         private void BuildOnlineUi()
         {
             ClientSize = new Size(1190, 600);
+
+            lblTurnClock = new Label
+            {
+                AutoSize = false,
+                Location = new Point(OnlinePanelX, 70),
+                Size = new Size(320, 28),
+                Font = new Font(Font.FontFamily, 12, FontStyle.Bold),
+                Text = "",
+                Visible = false
+            };
 
             var lblOnline = new Label
             {
@@ -104,7 +124,7 @@ namespace Caroclient.UI
                 Size = new Size(104, 29),
                 Text = "Xem trận"
             };
-            btnSpectate2.Click += (_, _) => SpectateSelectedPlayer();
+            btnSpectate2.Click += (_, _) => ChooseMatchToSpectate();
 
             gbInviteMessage = new GroupBox
             {
@@ -158,7 +178,7 @@ namespace Caroclient.UI
 
             Controls.AddRange(new Control[]
             {
-                lblOnline, lstOnlinePlayers, btnRefreshPlayers, btnInvitePlayer,
+                lblTurnClock, lblOnline, lstOnlinePlayers, btnRefreshPlayers, btnInvitePlayer,
                 btnSpectate2, gbInviteMessage, btnSurrender, rtbLog
             });
 
@@ -171,6 +191,7 @@ namespace Caroclient.UI
         private const int OnlinePanelX = 840;
         private Button btnRefreshPlayers = null!;
         private Button btnSpectate2 = null!;
+        private Label lblTurnClock = null!;
 
         #endregion
 
@@ -231,6 +252,34 @@ namespace Caroclient.UI
             client.OnInviteRejected += rejected => RunOnUi(() =>
                 Log($"Lời mời bị từ chối (người chơi {rejected.ByPlayerId})."));
 
+            client.OnMatchListReceived += list => RunOnUi(() =>
+            {
+                if (!dangChonTranDeXem)
+                {
+                    return;
+                }
+
+                dangChonTranDeXem = false;
+                ShowMatchPicker(list);
+            });
+
+            client.OnPlayerDisconnected += notice => RunOnUi(() =>
+            {
+                waitingForPlayerId = notice.PlayerId;
+                reconnectSecondsLeft = notice.ReconnectTimeLeft;
+                ChessBoard.SetInteractive(false);
+                UpdateClockLabel();
+                Log($"Người chơi {notice.PlayerId} mất kết nối. Ván tạm dừng, "
+                    + $"chờ tối đa {notice.ReconnectTimeLeft} giây.");
+            });
+
+            client.OnPlayerReconnected += notice => RunOnUi(() =>
+            {
+                waitingForPlayerId = null;
+                reconnectSecondsLeft = 0;
+                Log($"Người chơi {notice.PlayerId} đã kết nối lại. Ván tiếp tục.");
+            });
+
             client.OnGameStateReceived += state => RunOnUi(() => ApplyGameState(state));
 
             client.OnGameResultReceived += result => RunOnUi(() => ApplyGameResult(result));
@@ -264,14 +313,19 @@ namespace Caroclient.UI
                 }
             });
 
-            connection.Disconnected += reason => RunOnUi(() =>
+            connection.Disconnected += reason =>
             {
-                Log($"Mất kết nối: {reason}");
-                ChessBoard.SetInteractive(false);
-                btnSurrender.Enabled = false;
-            });
+                RunOnUi(() =>
+                {
+                    Log($"Mất kết nối: {reason}. Đang thử kết nối lại...");
+                    ChessBoard.SetInteractive(false);
+                    btnSurrender.Enabled = false;
+                });
 
-            connection.Reconnected += () => RunOnUi(() => Log("Đã kết nối lại. Hãy đăng nhập lại."));
+                _ = TryReconnectAsync();
+            };
+
+            connection.Reconnected += () => RunOnUi(() => Log("Đã kết nối lại TCP."));
         }
 
         private void ApplyGameState(GameStateMessage state)
@@ -295,9 +349,63 @@ namespace Caroclient.UI
             gbInviteMessage.Visible = false;
 
             txtPlayerName2.Text = isSpectator ? "Đang xem" : "O - Đối thủ";
+
+            // Khán giả vào giữa trận cũng nhận đúng đồng hồ này trong game_state.
+            waitingForPlayerId = state.WaitingForPlayerId;
+            reconnectSecondsLeft = state.ReconnectTimeLeft ?? 0;
+            turnSecondsLeft = state.TurnTimeLeft;
+            if (state.Status == "playing")
+            {
+                lblTurnClock.Visible = true;
+                UpdateClockLabel();
+                turnClockTimer.Start();
+            }
+            else
+            {
+                StopTurnClock();
+            }
+
             Log(myTurn
                 ? $"Phòng {state.RoomId}: đến lượt bạn."
                 : $"Phòng {state.RoomId}: chờ đối thủ ({state.CurrentPlayerId}).");
+        }
+
+        private void TurnClockTick(object? sender, EventArgs e)
+        {
+            if (waitingForPlayerId is not null)
+            {
+                if (reconnectSecondsLeft > 0)
+                {
+                    reconnectSecondsLeft--;
+                }
+            }
+            else if (turnSecondsLeft > 0)
+            {
+                turnSecondsLeft--;
+            }
+
+            UpdateClockLabel();
+        }
+
+        private void UpdateClockLabel()
+        {
+            lblTurnClock.Visible = true;
+            if (waitingForPlayerId is not null)
+            {
+                lblTurnClock.ForeColor = Color.DarkOrange;
+                lblTurnClock.Text = $"Chờ {waitingForPlayerId} kết nối lại: {reconnectSecondsLeft}s";
+                return;
+            }
+
+            lblTurnClock.ForeColor = turnSecondsLeft <= 5 ? Color.Firebrick : Color.Black;
+            lblTurnClock.Text = $"Thời gian suy nghĩ: {turnSecondsLeft}s";
+        }
+
+        private void StopTurnClock()
+        {
+            turnClockTimer.Stop();
+            lblTurnClock.Visible = false;
+            waitingForPlayerId = null;
         }
 
         private void ApplyGameResult(GameResultMessage result)
@@ -305,6 +413,7 @@ namespace Caroclient.UI
             ChessBoard.SetInteractive(false);
             btnSurrender.Enabled = false;
             roomId = null;
+            StopTurnClock();
 
             string text = result.Result switch
             {
@@ -312,6 +421,14 @@ namespace Caroclient.UI
                 "lose" => "Bạn thua!",
                 "draw" => "Ván đấu hòa!",
                 _ => $"Kết thúc: {result.Result}"
+            };
+
+            text += result.Reason switch
+            {
+                "timeout" => "\n(Hết thời gian suy nghĩ của một lượt.)",
+                "disconnect" => "\n(Một bên mất kết nối quá thời gian cho phép.)",
+                "forfeit" => "\n(Một bên rời phòng giữa trận.)",
+                _ => ""
             };
 
             if (result.Result == "win")
@@ -364,15 +481,25 @@ namespace Caroclient.UI
             await SafeSendAsync(client.SendInviteAsync(entry.PlayerId, Guid.NewGuid().ToString("N")));
         }
 
-        private async void SpectateSelectedPlayer()
+        /// <summary>
+        /// Xin danh sách trận đang diễn ra. Bảng chọn phòng được mở khi
+        /// match_list về, ở handler OnMatchListReceived.
+        /// </summary>
+        private async void ChooseMatchToSpectate()
         {
-            if (lstOnlinePlayers.SelectedItem is not PlayerEntry entry)
+            dangChonTranDeXem = true;
+            await SafeSendAsync(client.GetMatchListAsync());
+        }
+
+        private async void ShowMatchPicker(MatchListMessage list)
+        {
+            if (list.Matches.Count == 0)
             {
-                MessageBox.Show("Hãy chọn một người chơi đang thi đấu.", "Caro", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Hiện không có trận nào đang diễn ra.", "Xem trận", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
-            string? room = PromptRoomId();
+            string? room = PromptMatchChoice(list);
             if (string.IsNullOrWhiteSpace(room))
             {
                 return;
@@ -382,28 +509,74 @@ namespace Caroclient.UI
             await SafeSendAsync(client.SpectateAsync(room));
         }
 
-        private static string? PromptRoomId()
+        private static string? PromptMatchChoice(MatchListMessage list)
         {
             using var dialog = new Form
             {
-                Text = "Xem trận",
+                Text = "Chọn trận để xem",
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 StartPosition = FormStartPosition.CenterParent,
-                ClientSize = new Size(320, 120),
+                ClientSize = new Size(460, 260),
                 MinimizeBox = false,
                 MaximizeBox = false
             };
 
-            var label = new Label { AutoSize = true, Location = new Point(12, 15), Text = "Nhập room_id muốn xem:" };
-            var input = new TextBox { Location = new Point(12, 45), Size = new Size(296, 27) };
-            var ok = new Button { DialogResult = DialogResult.OK, Location = new Point(132, 82), Size = new Size(85, 29), Text = "Xem" };
-            var cancel = new Button { DialogResult = DialogResult.Cancel, Location = new Point(223, 82), Size = new Size(85, 29), Text = "Huỷ" };
+            var label = new Label { AutoSize = true, Location = new Point(12, 12), Text = "Các trận đang diễn ra:" };
+            var listBox = new ListBox { Location = new Point(12, 40), Size = new Size(436, 164) };
+            foreach (MatchSummary match in list.Matches)
+            {
+                listBox.Items.Add(new MatchEntry(match));
+            }
+            listBox.SelectedIndex = 0;
 
-            dialog.Controls.AddRange(new Control[] { label, input, ok, cancel });
+            var ok = new Button { DialogResult = DialogResult.OK, Location = new Point(272, 218), Size = new Size(85, 29), Text = "Xem" };
+            var cancel = new Button { DialogResult = DialogResult.Cancel, Location = new Point(363, 218), Size = new Size(85, 29), Text = "Huỷ" };
+            listBox.DoubleClick += (_, _) => { dialog.DialogResult = DialogResult.OK; };
+
+            dialog.Controls.AddRange(new Control[] { label, listBox, ok, cancel });
             dialog.AcceptButton = ok;
             dialog.CancelButton = cancel;
 
-            return dialog.ShowDialog() == DialogResult.OK ? input.Text.Trim() : null;
+            return dialog.ShowDialog() == DialogResult.OK && listBox.SelectedItem is MatchEntry entry
+                ? entry.RoomId
+                : null;
+        }
+
+        /// <summary>
+        /// Nối lại TCP rồi đăng nhập lại ngay. Nếu còn trong thời gian cho phép,
+        /// server trả về luôn game_state của ván đang dở.
+        /// </summary>
+        private async Task TryReconnectAsync()
+        {
+            bool reconnected;
+            try
+            {
+                reconnected = await connection.ReconnectAsync(3, TimeSpan.FromSeconds(2));
+            }
+            catch (Exception ex)
+            {
+                RunOnUi(() => Log($"Kết nối lại thất bại: {ex.Message}"));
+                return;
+            }
+
+            if (!reconnected)
+            {
+                RunOnUi(() =>
+                {
+                    Log("Không kết nối lại được. Ván đang dở sẽ bị xử thua khi hết thời gian chờ.");
+                    StopTurnClock();
+                });
+                return;
+            }
+
+            if (string.IsNullOrEmpty(Password))
+            {
+                RunOnUi(() => Log("Chưa có mật khẩu đã lưu, hãy đăng nhập lại thủ công."));
+                return;
+            }
+
+            RunOnUi(() => Log($"Đang đăng nhập lại bằng tài khoản {Username}..."));
+            await SafeSendAsync(client.LoginAsync(Username, Password));
         }
 
         private async Task RespondToInviteAsync(bool accept)
@@ -485,6 +658,21 @@ namespace Caroclient.UI
         {
             rtbLog.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
             rtbLog.ScrollToCaret();
+        }
+
+        private sealed class MatchEntry
+        {
+            public MatchEntry(MatchSummary match)
+            {
+                RoomId = match.RoomId;
+                Text = $"Phòng {match.RoomId}: {match.PlayerXName} (X) vs {match.PlayerOName} (O)"
+                    + $" - {match.MoveCount} nước, {match.SpectatorCount} khán giả, còn {match.TurnTimeLeft}s";
+            }
+
+            public string RoomId { get; }
+            public string Text { get; }
+
+            public override string ToString() => Text;
         }
 
         private sealed class PlayerEntry

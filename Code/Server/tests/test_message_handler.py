@@ -8,7 +8,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.game.caro import Caro
-from app.handlers.message_handlers import MessageHandler, hash_password
+from app.handlers.message_handlers import (
+    RECONNECT_GRACE_SECONDS,
+    TURN_TIME_LIMIT_SECONDS,
+    MessageHandler,
+    hash_password,
+)
 from app.matchmaking.invite_manager import InviteManager
 from app.matchmaking.player_manager import PlayerManager
 from app.matchmaking.room_manager import RoomManager
@@ -90,6 +95,19 @@ class FakeUser:
         self.ranking = 1000
 
 
+class FakeClock:
+    """Dong ho gia: test tua thoi gian toi thay vi ngoi cho that."""
+
+    def __init__(self, now: float = 1000.0):
+        self.now = now
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
+
+
 class FakeSocket:
     """Dung thay Connection: `send` la dong bo va chi gom payload lai."""
 
@@ -111,6 +129,7 @@ class MessageHandlerTest(unittest.TestCase):
         self.alice_socket = object()
         self.bob_socket = object()
         self.write_queue = FakeQueue()
+        self.clock = FakeClock()
 
     def _handler(self, *, board_factory=None):
         users = {
@@ -124,6 +143,7 @@ class MessageHandlerTest(unittest.TestCase):
             db_session=FakeSession(users),
             board_factory=board_factory,
             write_queue=self.write_queue,
+            clock=self.clock,
         )
 
     def _login_both(self, handler):
@@ -290,6 +310,143 @@ class MessageHandlerTest(unittest.TestCase):
 
         self.assertEqual([{"type": "origin"}, {"type": "broadcast"}], origin.messages)
         self.assertEqual([{"type": "targeted"}, {"type": "broadcast"}], other.messages)
+
+
+    # ----------------------------------------------------------------
+    #  Gioi han thoi gian suy nghi moi luot
+    # ----------------------------------------------------------------
+    def test_turn_timeout_awards_the_win_to_the_opponent(self):
+        handler = self._handler()
+        self._login_both(handler)
+        room_id = self._start_game(handler)
+
+        self.clock.advance(TURN_TIME_LIMIT_SECONDS - 1)
+        self.assertEqual([], handler.tick(), "chua het gio thi khong duoc dung van")
+
+        self.clock.advance(2)
+        deliveries = handler.tick()
+
+        results = {
+            delivery["targets"][0]: delivery["payload"]
+            for delivery in deliveries
+            if delivery["payload"]["type"] == "game_result"
+        }
+        # Alice cam quan X nen dang toi luot — het gio la thua.
+        self.assertEqual("lose", results[self.alice_id]["result"])
+        self.assertEqual("win", results[self.bob_id]["result"])
+        self.assertEqual("timeout", results[self.bob_id]["reason"])
+        self.assertEqual(RoomStatus.FINISHED, self.room_manager.get_room(room_id).status)
+        self.assertEqual(PlayerStatus.IDLE, self.player_manager.get_player(self.alice_id).status)
+
+    def test_each_move_refills_the_thinking_clock(self):
+        handler = self._handler()
+        self._login_both(handler)
+        room_id = self._start_game(handler)
+
+        self.clock.advance(TURN_TIME_LIMIT_SECONDS - 5)
+        state = handler.handle(
+            {"type": "make_move", "room_id": room_id, "playerId": self.alice_id, "row": 0, "col": 0},
+            self.alice_socket,
+        )[0]["payload"]
+        self.assertEqual(TURN_TIME_LIMIT_SECONDS, state["turnTimeLeft"])
+
+        self.clock.advance(TURN_TIME_LIMIT_SECONDS - 5)
+        self.assertEqual([], handler.tick())
+        self.assertEqual(RoomStatus.PLAYING, self.room_manager.get_room(room_id).status)
+
+    # ----------------------------------------------------------------
+    #  Ket noi lai trong thoi gian cho phep
+    # ----------------------------------------------------------------
+    def test_disconnect_holds_the_room_and_pauses_the_clock(self):
+        handler = self._handler()
+        self._login_both(handler)
+        room_id = self._start_game(handler)
+
+        deliveries = handler.disconnect(self.alice_socket)
+
+        room = self.room_manager.get_room(room_id)
+        self.assertEqual(RoomStatus.PLAYING, room.status, "van phai duoc giu lai cho nguoi quay ve")
+        self.assertIsNone(room.turn_deadline, "dong ho suy nghi phai tam dung")
+        notices = [d for d in deliveries if d["payload"]["type"] == "player_disconnected"]
+        self.assertEqual([self.bob_id], notices[0]["targets"])
+        self.assertEqual(RECONNECT_GRACE_SECONDS, notices[0]["payload"]["reconnectTimeLeft"])
+
+    def test_player_reconnects_in_time_and_keeps_playing(self):
+        handler = self._handler()
+        self._login_both(handler)
+        room_id = self._start_game(handler)
+        handler.disconnect(self.alice_socket)
+
+        self.clock.advance(RECONNECT_GRACE_SECONDS - 5)
+        self.assertEqual([], handler.tick(), "con han thi chua duoc xu thua")
+
+        handler.session.users = {"alice": FakeUser(self.alice_id, "alice", "test-password")}
+        new_socket = object()
+        result = handler.handle(
+            {"type": "login", "username": "alice", "password": "test-password"}, new_socket
+        )
+
+        states = [d for d in result if d["payload"]["type"] == "game_state"]
+        self.assertEqual(room_id, states[0]["payload"]["room_id"])
+        self.assertEqual(
+            TURN_TIME_LIMIT_SECONDS,
+            states[0]["payload"]["turnTimeLeft"],
+            "quay lai duoc cap tron ven mot luot moi",
+        )
+        self.assertIn(self.bob_id, states[0]["targets"])
+        self.assertEqual(PlayerStatus.PLAYING, self.player_manager.get_player(self.alice_id).status)
+
+        moved = handler.handle(
+            {"type": "make_move", "room_id": room_id, "playerId": self.alice_id, "row": 0, "col": 0},
+            new_socket,
+        )
+        self.assertEqual("game_state", moved[0]["payload"]["type"])
+
+    def test_reconnect_deadline_expires_and_opponent_wins(self):
+        handler = self._handler()
+        self._login_both(handler)
+        room_id = self._start_game(handler)
+        handler.disconnect(self.alice_socket)
+
+        self.clock.advance(RECONNECT_GRACE_SECONDS + 1)
+        deliveries = handler.tick()
+
+        results = {
+            delivery["targets"][0]: delivery["payload"]
+            for delivery in deliveries
+            if delivery["payload"]["type"] == "game_result"
+        }
+        self.assertEqual("win", results[self.bob_id]["result"])
+        self.assertEqual("disconnect", results[self.bob_id]["reason"])
+        self.assertEqual(RoomStatus.FINISHED, self.room_manager.get_room(room_id).status)
+        self.assertEqual(PlayerStatus.IDLE, self.player_manager.get_player(self.bob_id).status)
+
+    # ----------------------------------------------------------------
+    #  Danh sach tran dang dien ra
+    # ----------------------------------------------------------------
+    def test_match_list_only_shows_matches_in_progress(self):
+        handler = self._handler()
+        self._login_both(handler)
+        room_id = self._start_game(handler)
+
+        watcher_socket = object()
+        self.player_manager.add_player("3", "carol", watcher_socket)
+
+        matches = handler.handle({"type": "match_list"}, watcher_socket)[0]["payload"]["matches"]
+        self.assertEqual(1, len(matches))
+        self.assertEqual(room_id, matches[0]["room_id"])
+        self.assertEqual("alice", matches[0]["playerXName"])
+        self.assertEqual("bob", matches[0]["playerOName"])
+        self.assertEqual(0, matches[0]["spectatorCount"])
+        self.assertEqual(TURN_TIME_LIMIT_SECONDS, matches[0]["turnTimeLeft"])
+
+        handler.handle({"type": "spectate", "room_id": room_id}, watcher_socket)
+        matches = handler.handle({"type": "match_list"}, watcher_socket)[0]["payload"]["matches"]
+        self.assertEqual(1, matches[0]["spectatorCount"])
+
+        handler.handle({"type": "leave_room", "room_id": room_id}, self.alice_socket)
+        matches = handler.handle({"type": "match_list"}, watcher_socket)[0]["payload"]["matches"]
+        self.assertEqual([], matches, "van da ket thuc thi khong con trong danh sach")
 
 
 if __name__ == "__main__":

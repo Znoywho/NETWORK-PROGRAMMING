@@ -71,13 +71,20 @@ Server chạy trên **một luồng duy nhất** với `selectors.DefaultSelecto
 
 ```python
 while True:
-    events = self.sel.select(timeout=None)
+    events = self.sel.select(timeout=TICK_INTERVAL_SECONDS)
     for key, mask in events:
         if key.data is None:
             self._accept(key.fileobj)      # socket lang nghe
         else:
             self._handle_client(key.data, mask)   # socket client
+
+    self._dispatch(self.message_handler.tick())   # dong ho cac phong
 ```
+
+`select` có `timeout` chứ không chờ vô hạn: mỗi giây vòng lặp thức dậy
+một lần để `tick()` đối chiếu đồng hồ của các phòng. Hết giờ suy nghĩ
+hay hết hạn kết nối lại đều là sự kiện *không* có client nào gửi gì
+lên, nên nếu ngồi chờ socket thì không bao giờ phát hiện được.
 
 Cách phân biệt: socket lắng nghe được đăng ký với `data=None`, socket
 client được đăng ký kèm đối tượng `Connection`. Nhìn `key.data` là biết
@@ -127,6 +134,47 @@ thể đã bị đóng từ phía kia.
 
 ---
 
+## Đồng hồ: hết giờ suy nghĩ và hạn kết nối lại
+
+Hai mốc thời gian được giữ ngay trong `Room`
+(`app/models/matchmaking_models.py`), đo bằng `time.monotonic()` — đồng
+hồ đơn điệu, không nhảy khi máy đổi giờ hệ thống:
+
+| Trường | Ý nghĩa |
+|---|---|
+| `turn_deadline` | Thời điểm người đang tới lượt hết giờ suy nghĩ |
+| `reconnect_deadline` | Hạn chót để `disconnected_player` đăng nhập lại |
+
+Luật nhóm công bố (hằng số trong `app/handlers/message_handlers.py`):
+
+- `TURN_TIME_LIMIT_SECONDS = 30` — hết giờ thì người đang tới lượt **thua**.
+- `RECONNECT_GRACE_SECONDS = 60` — mất kết nối giữa trận thì phòng được
+  giữ nguyên trong 60 giây; quay lại kịp thì đánh tiếp, quá hạn thì đối
+  thủ **thắng**.
+
+Trong lúc chờ kết nối lại, `turn_deadline` bị đặt `None` — đồng hồ suy
+nghĩ **tạm dừng**. Nếu để nó chạy tiếp thì mạng chập chờn sẽ ăn mất lượt
+của người chơi hai lần, một lần vì rớt mạng và một lần vì hết giờ. Khi
+họ trở lại, server cấp trọn vẹn một lượt mới.
+
+`tick()` là nơi duy nhất thời gian trôi qua trở thành message. Nó duyệt
+các phòng đang `playing` và trả về delivery y như một handler bình
+thường, nên `_dispatch` không cần biết message sinh ra từ đâu — chỉ có
+điều delivery từ `tick()` không bao giờ dùng `targets = []` vì không có
+socket nào "vừa gửi".
+
+Client **không** nhận một message mỗi giây. `game_state` mang sẵn
+`turnTimeLeft` và `turnTimeLimit`, client tự đếm ngược tại chỗ; khán giả
+vào giữa trận cũng nhận đúng hai trường đó nên đồng hồ hiện lên khớp
+ngay. Cách này giữ đúng tinh thần "chỉ gửi khi trạng thái đổi" thay vì
+biến server thành máy phát nhịp.
+
+Mọi đường kết thúc một ván — thắng trên bàn cờ, hết giờ, rời phòng, hết
+hạn kết nối lại — đều đi qua `_end_game_deliveries()`, nên không đường
+nào quên tắt đồng hồ, ghi kết quả hay trả người chơi về `idle`.
+
+---
+
 ## Chọn người nhận — `_dispatch`
 
 Handler **không** tự gửi message. Nó trả về danh sách "delivery":
@@ -161,9 +209,18 @@ mở. Nhờ vậy test handler được bằng dict thuần, không cần dựng
 | `accept_invite` | `game_state` |
 | `reject_invite` | `reject_invite_result`, `invite_rejected` |
 | `make_move` | `game_state`, `game_result` |
+| `match_list` | `match_list` |
 | `spectate` | `game_state` |
 | `leave_room` | `leave_room_result` |
+| — | `player_disconnected`, `player_reconnected` |
 | — | `error` |
+
+`match_list` trả về các trận đang `playing` kèm tên hai người chơi, số
+nước đã đánh, số khán giả và thời gian còn lại của lượt — đủ để client
+dựng màn hình chọn phòng mà không bắt người dùng gõ tay `room_id`.
+
+`player_disconnected` và `player_reconnected` do server tự gửi cho
+những người còn lại trong phòng, không phải trả lời cho request nào.
 
 Schema đầy đủ của từng message ở `Code/Shared/message-schema.json`.
 
@@ -189,8 +246,17 @@ nối khi vượt.
 
 **Chưa có heartbeat.** Client rút mạng đột ngột không gửi gói FIN, nên
 `recv()` không trả về `b""`. Server vẫn coi người đó đang online cho tới
-khi TCP tự phát hiện, có thể mất vài phút. Muốn reconnect đúng hạn thì
-cần ping định kỳ và mốc thời gian chờ rõ ràng.
+khi TCP tự phát hiện, có thể mất vài phút — nghĩa là đồng hồ
+`reconnect_deadline` chỉ bắt đầu chạy từ lúc đó chứ không phải từ lúc
+dây mạng bị rút. Đóng kết nối "sạch" (client thoát, đóng socket) thì
+phát hiện ngay. Muốn chính xác trong mọi trường hợp thì cần ping định
+kỳ.
+
+**Phiên gắn với tài khoản, không có token.** Kết nối lại nghĩa là đăng
+nhập lại bằng username/password; server nhìn `player_id` để ghép người
+chơi về đúng phòng đang dở. Đủ dùng cho đồ án, nhưng một session token
+sẽ an toàn hơn vì client không phải giữ mật khẩu trong bộ nhớ để tự
+đăng nhập lại.
 
 **Buffer gửi không giới hạn.** Client nhận chậm khiến `_send_buff` dồn
 mãi mà không có cảnh báo hay log nào.

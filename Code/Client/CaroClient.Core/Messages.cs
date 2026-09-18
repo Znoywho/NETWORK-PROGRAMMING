@@ -86,6 +86,13 @@ public class MakeMoveMessage
     public int Col { get; set; }
 }
 
+/// <summary>Xin danh sách các trận đang diễn ra để chọn phòng khán giả.</summary>
+public class GetMatchListMessage
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "match_list";
+}
+
 public class SpectateMessage
 {
     [JsonPropertyName("type")]
@@ -185,6 +192,75 @@ public class InviteRejectedMessage
     public string ByPlayerId { get; set; } = string.Empty;
 }
 
+/// <summary>Danh sách trận đang diễn ra, dùng cho màn hình chọn phòng xem.</summary>
+public class MatchListMessage
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "match_list";
+
+    [JsonPropertyName("matches")]
+    public List<MatchSummary> Matches { get; set; } = new();
+}
+
+public class MatchSummary
+{
+    [JsonPropertyName("room_id")]
+    public string RoomId { get; set; } = string.Empty;
+
+    [JsonPropertyName("playerXId")]
+    public string PlayerXId { get; set; } = string.Empty;
+
+    [JsonPropertyName("playerXName")]
+    public string PlayerXName { get; set; } = string.Empty;
+
+    [JsonPropertyName("playerOId")]
+    public string PlayerOId { get; set; } = string.Empty;
+
+    [JsonPropertyName("playerOName")]
+    public string PlayerOName { get; set; } = string.Empty;
+
+    [JsonPropertyName("spectatorCount")]
+    public int SpectatorCount { get; set; }
+
+    [JsonPropertyName("moveCount")]
+    public int MoveCount { get; set; }
+
+    [JsonPropertyName("turnTimeLeft")]
+    public int TurnTimeLeft { get; set; }
+}
+
+/// <summary>
+/// Một người chơi mất kết nối. Ván CHƯA kết thúc: đồng hồ suy nghĩ tạm dừng
+/// và họ còn <see cref="ReconnectTimeLeft"/> giây để đăng nhập lại.
+/// </summary>
+public class PlayerDisconnectedMessage
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "player_disconnected";
+
+    [JsonPropertyName("room_id")]
+    public string RoomId { get; set; } = string.Empty;
+
+    [JsonPropertyName("playerId")]
+    public string PlayerId { get; set; } = string.Empty;
+
+    [JsonPropertyName("reconnectTimeLeft")]
+    public int ReconnectTimeLeft { get; set; }
+}
+
+/// <summary>Người mất kết nối đã quay lại kịp hạn; server gửi kèm game_state mới.</summary>
+public class PlayerReconnectedMessage
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "player_reconnected";
+
+    [JsonPropertyName("room_id")]
+    public string RoomId { get; set; } = string.Empty;
+
+    [JsonPropertyName("playerId")]
+    public string PlayerId { get; set; } = string.Empty;
+}
+
 public class GameStateMessage
 {
     [JsonPropertyName("type")]
@@ -201,6 +277,21 @@ public class GameStateMessage
 
     [JsonPropertyName("status")]
     public string Status { get; set; } = string.Empty;
+
+    /// <summary>Tổng thời gian suy nghĩ của một lượt, tính bằng giây.</summary>
+    [JsonPropertyName("turnTimeLimit")]
+    public int TurnTimeLimit { get; set; }
+
+    /// <summary>Số giây còn lại của lượt hiện tại; client tự đếm ngược từ mốc này.</summary>
+    [JsonPropertyName("turnTimeLeft")]
+    public int TurnTimeLeft { get; set; }
+
+    /// <summary>Khác null khi phòng đang chờ một người chơi kết nối lại.</summary>
+    [JsonPropertyName("waitingForPlayerId")]
+    public string? WaitingForPlayerId { get; set; }
+
+    [JsonPropertyName("reconnectTimeLeft")]
+    public int? ReconnectTimeLeft { get; set; }
 }
 
 public class GameResultMessage
@@ -216,6 +307,10 @@ public class GameResultMessage
 
     [JsonPropertyName("winnerId")]
     public string? WinnerId { get; set; }
+
+    /// <summary>timeout | disconnect | forfeit. Null nghĩa là thắng thua bình thường trên bàn cờ.</summary>
+    [JsonPropertyName("reason")]
+    public string? Reason { get; set; }
 }
 
 public class LeaveRoomResultMessage
