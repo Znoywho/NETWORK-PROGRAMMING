@@ -746,6 +746,9 @@ class MessageHandler:
         ket noi lai) deu di qua day nen khong duong nao quen mat mot buoc.
         """
         room.status = RoomStatus.FINISHED
+        if room.board_instance is not None:
+            # Khoa ban co luon: validate_move se tu choi moi nuoc di sau khi van da xong.
+            room.board_instance.status = "finished"
         room.turn_deadline = None
         if room.disconnected_player is not None:
             self._awaiting_reconnect.pop(room.disconnected_player, None)

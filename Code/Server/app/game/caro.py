@@ -101,6 +101,8 @@ class Caro:
         else:
             self.turn = 1
 
+        self.current_turn = self.player_X if self.XO == "X" else self.player_O
+
     def _get_all_rows(self):
         return self.grid
 

@@ -207,6 +207,34 @@ class MessageHandlerTest(unittest.TestCase):
         self.assertEqual(PlayerStatus.IDLE, self.player_manager.get_player(self.alice_id).status)
         self.assertEqual(PlayerStatus.IDLE, self.player_manager.get_player(self.bob_id).status)
 
+    def test_winning_move_locks_the_board(self):
+        """Van xong thi ban co phai bi khoa, khong chi rieng room."""
+        handler = self._handler(board_factory=lambda: Caro(1, 1, winning_condition=1))
+        self._login_both(handler)
+        room_id = self._start_game(handler)
+        board = self.room_manager.get_room(room_id).board_instance
+
+        handler.handle(
+            {"type": "make_move", "room_id": room_id, "playerId": self.alice_id, "row": 0, "col": 0}, self.alice_socket
+        )
+
+        self.assertEqual("finished", board.status)
+        self.assertFalse(board.validate_move(0, 0, "O"))
+
+    def test_timeout_also_locks_the_board(self):
+        """Moi duong ket thuc deu qua _end_game_deliveries, khong rieng duong thang."""
+        handler = self._handler()
+        self._login_both(handler)
+        room_id = self._start_game(handler)
+        board = self.room_manager.get_room(room_id).board_instance
+        self.assertEqual("playing", board.status)
+
+        self.clock.advance(TURN_TIME_LIMIT_SECONDS + 1)
+        handler.tick()
+
+        self.assertEqual("finished", board.status)
+        self.assertFalse(board.validate_move(0, 0, "X"))
+
     def test_move_cannot_impersonate_another_player(self):
         handler = self._handler()
         self._login_both(handler)
