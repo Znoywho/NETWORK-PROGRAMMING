@@ -11,6 +11,11 @@ string? roomId = null;
 string? myPlayerId = null;
 int[][] board = Array.Empty<int[]>();
 
+// Giu lai tai khoan de sau khi noi lai TCP thi tu dang nhap, nho do server
+// ghep nguoi choi ve dung van ho dang bo do.
+string? savedUsername = null;
+string? savedPassword = null;
+
 Console.Write("Địa chỉ server (Enter để dùng mặc định tcp://localhost:8765): ");
 string? uriInput = Console.ReadLine();
 
@@ -45,6 +50,15 @@ client.OnGameStateReceived += state =>
     Console.WriteLine($"currentPlayerId: {state.CurrentPlayerId}"
         + (state.CurrentPlayerId == Volatile.Read(ref myPlayerId) ? "  <-- ĐẾN LƯỢT BẠN" : ""));
     Console.WriteLine($"status: {state.Status}");
+    if (state.Status == "playing")
+    {
+        Console.WriteLine($"Thời gian suy nghĩ còn: {state.TurnTimeLeft}/{state.TurnTimeLimit} giây");
+        if (!string.IsNullOrWhiteSpace(state.WaitingForPlayerId))
+        {
+            Console.WriteLine($"Đang chờ người chơi {state.WaitingForPlayerId} kết nối lại "
+                + $"({state.ReconnectTimeLeft ?? 0} giây nữa).");
+        }
+    }
     Console.WriteLine("========================================");
 
     PrintBoard(board);
@@ -70,6 +84,18 @@ client.OnGameResultReceived += result =>
         Console.WriteLine($"Người thắng: {result.WinnerId}");
     }
 
+    string? why = result.Reason switch
+    {
+        "timeout" => "Lý do: hết thời gian suy nghĩ của một lượt.",
+        "disconnect" => "Lý do: một bên mất kết nối quá thời gian cho phép.",
+        "forfeit" => "Lý do: một bên rời phòng giữa trận.",
+        _ => null
+    };
+    if (why is not null)
+    {
+        Console.WriteLine(why);
+    }
+
     Console.WriteLine("========================================");
     Volatile.Write(ref gameEnded, 1);
 };
@@ -91,6 +117,40 @@ client.OnOnlinePlayersReceived += onlinePlayers =>
         }
     }
     Console.WriteLine("===================================");
+};
+
+client.OnMatchListReceived += list =>
+{
+    Console.WriteLine();
+    Console.WriteLine("===== TRẬN ĐANG DIỄN RA =====");
+    if (list.Matches.Count == 0)
+    {
+        Console.WriteLine("Hiện không có trận nào đang diễn ra.");
+    }
+    else
+    {
+        foreach (MatchSummary match in list.Matches)
+        {
+            Console.WriteLine($"- room_id={match.RoomId}: {match.PlayerXName} (X) vs {match.PlayerOName} (O)"
+                + $" | {match.MoveCount} nước | {match.SpectatorCount} khán giả"
+                + $" | còn {match.TurnTimeLeft}s");
+        }
+        Console.WriteLine("Gõ /spectate <room_id> để vào xem.");
+    }
+    Console.WriteLine("=============================");
+};
+
+client.OnPlayerDisconnected += notice =>
+{
+    Console.WriteLine();
+    Console.WriteLine($"[MẤT KẾT NỐI] Người chơi {notice.PlayerId} rớt mạng. "
+        + $"Ván tạm dừng, chờ tối đa {notice.ReconnectTimeLeft} giây.");
+};
+
+client.OnPlayerReconnected += notice =>
+{
+    Console.WriteLine();
+    Console.WriteLine($"[QUAY LẠI] Người chơi {notice.PlayerId} đã kết nối lại. Ván tiếp tục.");
 };
 
 client.OnInviteReceived += invite =>
@@ -157,7 +217,30 @@ connection.Disconnected += reason =>
 };
 
 connection.Reconnected += () =>
-    Console.WriteLine("[KẾT NỐI LẠI] Đã kết nối lại TCP thành công. Hãy /login lại.");
+{
+    string? user = Volatile.Read(ref savedUsername);
+    string? pass = Volatile.Read(ref savedPassword);
+    if (string.IsNullOrWhiteSpace(user))
+    {
+        Console.WriteLine("[KẾT NỐI LẠI] Đã kết nối lại TCP thành công. Hãy /login lại.");
+        return;
+    }
+
+    // Dang nhap lai ngay: con trong thoi gian cho phep thi server tra ve
+    // luon game_state cua van dang do.
+    Console.WriteLine($"[KẾT NỐI LẠI] Đã nối lại TCP, đang đăng nhập lại bằng tài khoản {user}...");
+    _ = Task.Run(async () =>
+    {
+        try
+        {
+            await client.LoginAsync(user, pass ?? "");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Đăng nhập lại thất bại: {ex.Message}");
+        }
+    });
+};
 
 try
 {
@@ -175,6 +258,9 @@ string username = (Console.ReadLine() ?? "").Trim();
 
 Console.Write("Password: ");
 string password = Console.ReadLine() ?? "";
+
+savedUsername = username;
+savedPassword = password;
 
 try
 {
@@ -285,6 +371,8 @@ async Task HandleCommandAsync(string command)
             return;
         }
 
+        Volatile.Write(ref savedUsername, parts[1]);
+        Volatile.Write(ref savedPassword, parts[2]);
         await client.LoginAsync(parts[1], parts[2]);
         return;
     }
@@ -323,6 +411,12 @@ async Task HandleCommandAsync(string command)
         }
 
         await client.RejectInviteAsync(parts[1], parts.Length == 3 ? parts[2] : null);
+        return;
+    }
+
+    if (verb.Equals("/matches", StringComparison.OrdinalIgnoreCase))
+    {
+        await client.GetMatchListAsync();
         return;
     }
 
@@ -405,6 +499,7 @@ static void PrintHelp()
     Console.WriteLine("  /invite <playerId> [id]      Mời một người chơi");
     Console.WriteLine("  /accept <inviteId>           Chấp nhận lời mời");
     Console.WriteLine("  /reject <inviteId> [lý do]   Từ chối lời mời");
+    Console.WriteLine("  /matches                     Xem danh sách trận đang diễn ra");
     Console.WriteLine("  /spectate <room_id>          Xem một trận đang diễn ra");
     Console.WriteLine("  /leave [room_id]             Rời phòng hiện tại");
     Console.WriteLine("  /login <user> <pass>         Đăng nhập lại");

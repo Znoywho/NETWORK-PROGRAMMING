@@ -19,6 +19,11 @@ class RoomManager:
         with self._lock:
             return self._rooms.get(room_id)
 
+    def list_rooms(self) -> list[Room]:
+        """Ban sao danh sach phong, de nguoi goi duyet ma khong giu khoa."""
+        with self._lock:
+            return list(self._rooms.values())
+
     def remove_room(self, room_id: str) -> None:
         with self._lock:
             self._rooms.pop(room_id, None)

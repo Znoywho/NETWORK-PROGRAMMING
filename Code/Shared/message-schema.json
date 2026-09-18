@@ -20,6 +20,7 @@
         { "$ref": "#/$defs/accept_invite" },
         { "$ref": "#/$defs/reject_invite" },
         { "$ref": "#/$defs/make_move" },
+        { "$ref": "#/$defs/match_list_request" },
         { "$ref": "#/$defs/spectate" },
         { "$ref": "#/$defs/leave_room" }
       ]
@@ -36,6 +37,9 @@
         { "$ref": "#/$defs/invite_rejected" },
         { "$ref": "#/$defs/reject_invite_result" },
         { "$ref": "#/$defs/leave_room_result" },
+        { "$ref": "#/$defs/match_list_response" },
+        { "$ref": "#/$defs/player_disconnected" },
+        { "$ref": "#/$defs/player_reconnected" },
         { "$ref": "#/$defs/game_state" },
         { "$ref": "#/$defs/game_result" },
         { "$ref": "#/$defs/error" }
@@ -232,6 +236,72 @@
       "additionalProperties": false
     },
 
+    "match_list_request": {
+      "description": "Xin danh sach cac tran dang dien ra de chon phong vao xem.",
+      "type": "object",
+      "properties": {
+        "type": { "const": "match_list" }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+
+    "match_list_response": {
+      "description": "Chi liet ke tran co status 'playing'. Van da ket thuc khong con trong danh sach.",
+      "type": "object",
+      "properties": {
+        "type": { "const": "match_list" },
+        "matches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "room_id": { "$ref": "#/$defs/roomId" },
+              "playerXId": { "$ref": "#/$defs/playerId" },
+              "playerXName": { "type": "string" },
+              "playerOId": { "$ref": "#/$defs/playerId" },
+              "playerOName": { "type": "string" },
+              "spectatorCount": { "type": "integer", "minimum": 0 },
+              "moveCount": { "description": "So nuoc da danh, de biet tran moi mo hay sap tan.", "type": "integer", "minimum": 0 },
+              "turnTimeLeft": { "type": "integer", "minimum": 0 }
+            },
+            "required": [
+              "room_id", "playerXId", "playerXName", "playerOId", "playerOName",
+              "spectatorCount", "moveCount", "turnTimeLeft"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["type", "matches"],
+      "additionalProperties": false
+    },
+
+    "player_disconnected": {
+      "description": "Mot nguoi choi mat ket noi giua tran. Van CHUA ket thuc: doi thu va khan gia cho toi het reconnectTimeLeft giay. Dong ho suy nghi tam dung trong luc nay.",
+      "type": "object",
+      "properties": {
+        "type": { "const": "player_disconnected" },
+        "room_id": { "$ref": "#/$defs/roomId" },
+        "playerId": { "$ref": "#/$defs/playerId" },
+        "reconnectTimeLeft": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["type", "room_id", "playerId", "reconnectTimeLeft"],
+      "additionalProperties": false
+    },
+
+    "player_reconnected": {
+      "description": "Nguoi mat ket noi da quay lai kip han. Ngay sau message nay server gui game_state day du cho ca phong.",
+      "type": "object",
+      "properties": {
+        "type": { "const": "player_reconnected" },
+        "room_id": { "$ref": "#/$defs/roomId" },
+        "playerId": { "$ref": "#/$defs/playerId" }
+      },
+      "required": ["type", "room_id", "playerId"],
+      "additionalProperties": false
+    },
+
     "spectate": {
       "description": "Vao xem mot tran dau. Server tra game_state day du cua tran do.",
       "type": "object",
@@ -281,9 +351,28 @@
           }
         },
         "currentPlayerId": { "$ref": "#/$defs/playerId" },
-        "status": { "type": "string", "enum": ["waiting", "playing", "finished"] }
+        "status": { "type": "string", "enum": ["waiting", "playing", "finished"] },
+        "turnTimeLimit": {
+          "description": "Tong thoi gian suy nghi cua mot luot, tinh bang giay.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "turnTimeLeft": {
+          "description": "So giay con lai cua luot hien tai. 0 khi dong ho khong chay (van da ket thuc hoac dang cho ai do ket noi lai). Client tu dem nguoc tu moc nay.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "waitingForPlayerId": {
+          "description": "Chi co khi phong dang cho mot nguoi choi ket noi lai.",
+          "$ref": "#/$defs/playerId"
+        },
+        "reconnectTimeLeft": {
+          "description": "Chi co cung voi waitingForPlayerId: so giay con lai truoc khi nguoi do bi xu thua.",
+          "type": "integer",
+          "minimum": 0
+        }
       },
-      "required": ["type", "room_id", "board", "currentPlayerId", "status"],
+      "required": ["type", "room_id", "board", "currentPlayerId", "status", "turnTimeLimit", "turnTimeLeft"],
       "additionalProperties": false
     },
 
@@ -294,7 +383,12 @@
         "type": { "const": "game_result" },
         "room_id": { "$ref": "#/$defs/roomId" },
         "result": { "type": "string", "enum": ["win", "lose", "draw"] },
-        "winnerId": { "$ref": "#/$defs/playerId" }
+        "winnerId": { "$ref": "#/$defs/playerId" },
+        "reason": {
+          "description": "Vi sao van ket thuc. Khong co truong nay nghia la thang thua binh thuong tren ban co.",
+          "type": "string",
+          "enum": ["timeout", "disconnect", "forfeit"]
+        }
       },
       "required": ["type", "room_id", "result"],
       "additionalProperties": false

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
@@ -23,6 +24,19 @@ BOARD_ROWS = 15
 BOARD_COLS = 15
 WINNING_CONDITION = 5
 K = 32
+
+# Luat nhom cong bo cho hai dong ho duoi day:
+#
+#   - Het gio suy nghi cua mot luot  -> nguoi dang toi luot bi xu THUA.
+#   - Mat ket noi giua van           -> van duoc giu nguyen trong
+#     RECONNECT_GRACE_SECONDS giay; quay lai kip thi danh tiep, qua han
+#     thi doi thu duoc xu THANG.
+#
+# Dong ho suy nghi bi TAM DUNG trong luc cho ket noi lai, va duoc cap
+# lai tron ven khi nguoi choi tro ve — neu khong, mang chap chon se an
+# mat luot cua ho hai lan.
+TURN_TIME_LIMIT_SECONDS = 30
+RECONNECT_GRACE_SECONDS = 60
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +85,7 @@ class MessageHandler:
         db_session=None,
         write_queue=None,
         board_factory: Callable[[], Caro] | None = None,
+        clock: Callable[[], float] | None = None,
     ):
         self.pm = player_manager
         self.rm = room_manager
@@ -78,6 +93,10 @@ class MessageHandler:
         self.session = db_session if db_session is not None else session
         self.write_queue = write_queue if write_queue is not None else db_queue
         self.board_factory = board_factory or self._new_board
+        # Tiem duoc tu ngoai vao de test khong phai ngoi cho het 30 giay that.
+        self.clock = clock or time.monotonic
+        # player_id -> room_id cua nguoi dang mat ket noi va con han quay lai.
+        self._awaiting_reconnect: dict[str, str] = {}
 
     def handle(self, message: object, sock: object) -> list[dict[str, Any]]:
         """Handle one decoded client message without performing socket I/O."""
@@ -111,6 +130,7 @@ class MessageHandler:
             "accept_invite": self._accept_invite_handler,
             "reject_invite": self._reject_invite_handler,
             "make_move": self._make_move_handler,
+            "match_list": self._match_list_handler,
             "spectate": self._spectate_handler,
             "leave_room": self._leave_room_handler,
         }
@@ -130,7 +150,13 @@ class MessageHandler:
                     ]
 
     def disconnect(self, sock: object) -> list[dict[str, Any]]:
-        """Remove a disconnected player and notify affected connected clients."""
+        """Xu ly mot socket vua dut.
+
+        Nguoi choi dang trong van KHONG bi xu thua ngay: phong duoc giu
+        nguyen, dong ho suy nghi tam dung, va ho co
+        ``RECONNECT_GRACE_SECONDS`` giay de dang nhap lai. Qua han thi
+        ``tick()`` moi ket thuc van.
+        """
         player_id = self._find_id_by_sock(sock)
         if player_id is None:
             return []
@@ -139,24 +165,63 @@ class MessageHandler:
         player = self.pm.get_player(player_id)
         room = self.rm.get_room(player.current_room_id) if (player and player.current_room_id) else None
         if room and player_id in (room.player_x, room.player_o) and room.status == RoomStatus.PLAYING:
-            opponent_id = room.player_o if player_id == room.player_x else room.player_x
-            room.status = RoomStatus.FINISHED
-            # Ghi ket qua du con ai online de nhan thong bao hay khong.
-            self._persist_match_result(room, opponent_id)
-            self._set_player_idle(opponent_id)
-            for spectator_id in room.spectators:
-                self._set_player_idle(spectator_id)
+            if room.disconnected_player is not None and room.disconnected_player != player_id:
+                # Ca hai cung mat ket noi thi khong con ai de xu thang.
+                self.pm.remove_player(player_id)
+                return self._end_game_deliveries(room, None, reason="disconnect")
+
+            room.disconnected_player = player_id
+            room.reconnect_deadline = self.clock() + RECONNECT_GRACE_SECONDS
+            room.turn_deadline = None  # tam dung dong ho suy nghi
+            self._awaiting_reconnect[player_id] = room.room_id
 
             recipients = self._room_recipients(room, exclude={player_id})
             if recipients:
-                deliveries.extend(
-                    self._game_result_deliveries(room.room_id, opponent_id, [room.player_x, room.player_o])
+                deliveries.append(
+                    self._targeted(
+                        recipients,
+                        {
+                            "type": "player_disconnected",
+                            "room_id": room.room_id,
+                            "playerId": player_id,
+                            "reconnectTimeLeft": RECONNECT_GRACE_SECONDS,
+                        },
+                    )
                 )
         elif room and player_id in room.spectators:
             self.rm.remove_spectator(room.room_id, player_id)
 
         self.pm.remove_player(player_id)
         deliveries.append(self._broadcast_online_players())
+        return deliveries
+
+    def tick(self) -> list[dict[str, Any]]:
+        """Kiem tra dong ho cua moi phong; server goi moi vong lap selector.
+
+        Day la cho duy nhat thoi gian troi qua tro thanh mot su kien: het
+        gio suy nghi hoac het han cho ket noi lai deu ket thuc van dau ma
+        khong can client gui gi len.
+        """
+        now = self.clock()
+        deliveries: list[dict[str, Any]] = []
+
+        for room in self.rm.list_rooms():
+            if room.status != RoomStatus.PLAYING or room.board_instance is None:
+                continue
+
+            if room.reconnect_deadline is not None:
+                if now >= room.reconnect_deadline:
+                    winner_id = self._opponent_of(room, room.disconnected_player)
+                    deliveries.extend(
+                        self._end_game_deliveries(room, winner_id, reason="disconnect")
+                    )
+                continue  # dong ho suy nghi dang tam dung
+
+            if room.turn_deadline is not None and now >= room.turn_deadline:
+                loser_id = room.get_player_id_by_turn(room.board_instance.turn)
+                winner_id = self._opponent_of(room, loser_id)
+                deliveries.extend(self._end_game_deliveries(room, winner_id, reason="timeout"))
+
         return deliveries
 
     def _login_handler(self, message: dict[str, Any], sock: object) -> list[dict[str, Any]]:
@@ -198,8 +263,44 @@ class MessageHandler:
                 "username": user.username, 
                 "playerId": player_id
                 }),
+            *self._resume_after_reconnect(player_id),
             self._broadcast_online_players(),
         ]
+
+    def _resume_after_reconnect(self, player_id: str) -> list[dict[str, Any]]:
+        """Dua nguoi vua dang nhap lai ve dung van ho dang bo do.
+
+        Tra ve danh sach rong neu ho khong cho o phong nao — do la duong
+        di cua moi lan dang nhap binh thuong.
+        """
+        room_id = self._awaiting_reconnect.pop(player_id, None)
+        if room_id is None:
+            return []
+
+        room = self.rm.get_room(room_id)
+        if room is None or room.status != RoomStatus.PLAYING or room.disconnected_player != player_id:
+            return []
+
+        room.disconnected_player = None
+        room.reconnect_deadline = None
+        # Cap lai tron ven mot luot: ho vua mat ket noi chu khong phai da
+        # ngoi nghi may chuc giay.
+        self._start_turn(room)
+        self.pm.set_status(player_id, PlayerStatus.PLAYING)
+        self.pm.set_current_room(player_id, room_id)
+
+        deliveries: list[dict[str, Any]] = []
+        others = self._room_recipients(room, exclude={player_id})
+        if others:
+            deliveries.append(
+                self._targeted(
+                    others,
+                    {"type": "player_reconnected", "room_id": room_id, "playerId": player_id},
+                )
+            )
+        # Ban co day du cho ca phong, ke ca nguoi vua quay lai.
+        deliveries.append(self._targeted(self._room_recipients(room), self._game_state(room)))
+        return deliveries
 
 
     def _create_user_hanlder(self, message, sock):
@@ -325,6 +426,7 @@ class MessageHandler:
         if room is None or room.board_instance is None:
             return [self._error("ROOM_ERROR", "Could not create a game room.")]
         room.status = RoomStatus.PLAYING
+        self._start_turn(room)
 
         return [self._targeted(self._room_recipients(room), self._game_state(room))]
 
@@ -384,25 +486,17 @@ class MessageHandler:
         # (bat dau tu 1, so le la luot X).
         self._persist_move(room, player_id, row, col, len(board.last_move))
 
-        recipients = self._room_recipients(room)
         winner = board._get_winner()
         if winner == -1:
-            return [self._targeted(recipients, self._game_state(room))]
+            # Nuoc di hop le nap lai dong ho cho doi thu.
+            self._start_turn(room)
+            return [self._targeted(self._room_recipients(room), self._game_state(room))]
 
+        # score_player doi phong da o trang thai FINISHED moi chiu tinh diem.
         room.status = RoomStatus.FINISHED
         self.score_player(room, winner)
         winner_id = room.player_x if winner == 0 else room.player_o if winner == 1 else None
-        self._persist_match_result(room, winner_id, drawn=winner == 2)
-        for room_player_id in (room.player_x, room.player_o):
-            self._set_player_idle(room_player_id)
-        for spectator_id in room.spectators:
-            self._set_player_idle(spectator_id)
-
-        return [
-            self._targeted(recipients, self._game_state(room, winner_id or player_id)),
-            *self._game_result_deliveries(room.room_id, winner_id, [room.player_x, room.player_o]),
-            self._broadcast_online_players(),
-        ]
+        return self._end_game_deliveries(room, winner_id, drawn=winner == 2)
 
 
     def score_player(self, room: Room, winner: int):
@@ -514,6 +608,41 @@ class MessageHandler:
             },
         )
 
+    def _match_list_handler(self, _player_id: str, _message: dict[str, Any]) -> list[dict[str, Any]]:
+        """Danh sach tran dang dien ra, de nguoi dung chon phong vao xem."""
+        return [self._reply({"type": "match_list", "matches": self._list_active_matches()})]
+
+    def _list_active_matches(self) -> list[dict[str, Any]]:
+        matches = []
+        for room in self.rm.list_rooms():
+            if room.status != RoomStatus.PLAYING or room.board_instance is None:
+                continue
+            matches.append(
+                {
+                    "room_id": room.room_id,
+                    "playerXId": room.player_x,
+                    "playerXName": self._username_of(room.player_x),
+                    "playerOId": room.player_o,
+                    "playerOName": self._username_of(room.player_o),
+                    "spectatorCount": len(room.spectators),
+                    "moveCount": len(room.board_instance.last_move),
+                    "turnTimeLeft": self._turn_time_left(room),
+                }
+            )
+        return matches
+
+    def _username_of(self, player_id: str) -> str:
+        """Ten hien thi cua mot player_id, ke ca khi ho dang mat ket noi."""
+        player = self.pm.get_player(player_id)
+        if player is not None:
+            return player.username
+        try:
+            user = self.session.query(User).filter(User.id == as_db_id(player_id)).first()
+        except Exception:
+            logger.exception("Khong tra cuu duoc username cua %s", player_id)
+            return player_id
+        return user.username if user else player_id
+
     def _spectate_handler(self, player_id: str, message: dict[str, Any]) -> list[dict[str, Any]]:
         room_id = message.get("room_id")
         if not isinstance(room_id, str) or not room_id:
@@ -565,20 +694,10 @@ class MessageHandler:
                 self._broadcast_online_players(),
             ]
 
-        opponent_id = room.player_o if player_id == room.player_x else room.player_x
-        recipients = self._room_recipients(room)
-        room.status = RoomStatus.FINISHED
-        self._persist_match_result(room, opponent_id)
-        for room_player_id in (room.player_x, room.player_o):
-            self._set_player_idle(room_player_id)
-        for spectator_id in room.spectators:
-            self._set_player_idle(spectator_id)
-
+        opponent_id = self._opponent_of(room, player_id)
         return [
             self._reply({"type": "leave_room_result", "success": True, "role": "player", "winnerId": opponent_id}),
-            self._targeted(recipients, self._game_state(room, opponent_id)),
-            *self._game_result_deliveries(room.room_id, opponent_id, [room.player_x, room.player_o]),
-            self._broadcast_online_players(),
+            *self._end_game_deliveries(room, opponent_id, reason="forfeit"),
         ]
 
     def _check_user(self, username: str) -> User | None:
@@ -596,22 +715,86 @@ class MessageHandler:
     def _new_board(self) -> Caro:
         return Caro(BOARD_ROWS, BOARD_COLS, WINNING_CONDITION)
 
+    def _start_turn(self, room: Room) -> None:
+        """Cap tron ven mot luot suy nghi cho nguoi sap di."""
+        room.turn_deadline = self.clock() + TURN_TIME_LIMIT_SECONDS
+
+    def _turn_time_left(self, room: Room) -> int:
+        """So giay con lai cua luot hien tai; 0 khi dong ho khong chay."""
+        if room.turn_deadline is None:
+            return 0
+        return max(0, int(round(room.turn_deadline - self.clock())))
+
+    def _opponent_of(self, room: Room, player_id: str | None) -> str | None:
+        if player_id == room.player_x:
+            return room.player_o
+        if player_id == room.player_o:
+            return room.player_x
+        return None
+
+    def _end_game_deliveries(
+        self,
+        room: Room,
+        winner_id: str | None,
+        *,
+        drawn: bool = False,
+        reason: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Dong mot van: tat dong ho, ghi ket qua, tra moi nguoi ve idle.
+
+        Moi duong ket thuc (thang binh thuong, het gio, bo tran, het han
+        ket noi lai) deu di qua day nen khong duong nao quen mat mot buoc.
+        """
+        room.status = RoomStatus.FINISHED
+        room.turn_deadline = None
+        if room.disconnected_player is not None:
+            self._awaiting_reconnect.pop(room.disconnected_player, None)
+            room.disconnected_player = None
+        room.reconnect_deadline = None
+
+        recipients = self._room_recipients(room)
+        self._persist_match_result(room, winner_id, drawn=drawn)
+        for room_player_id in (room.player_x, room.player_o, *room.spectators):
+            self._set_player_idle(room_player_id)
+
+        return [
+            self._targeted(recipients, self._game_state(room, winner_id)),
+            *self._game_result_deliveries(
+                room.room_id, winner_id, [room.player_x, room.player_o], reason=reason
+            ),
+            self._broadcast_online_players(),
+        ]
+
     def _game_state(self, room: Room, current_player_id: str | None = None) -> dict[str, Any]:
         board = room.board_instance
         if board is None:
             raise ValueError("Room has no game board.")
         if current_player_id is None:
             current_player_id = room.get_player_id_by_turn(board.turn)
-        return {
+        payload = {
             "type": "game_state",
             "room_id": room.room_id,
             "board": [[0 if cell == "." else 1 if cell == "X" else 2 for cell in row] for row in board.grid],
             "currentPlayerId": current_player_id or room.player_x,
             "status": room.status.value,
+            # Khan gia vao giua tran cung nhan duoc dong ho, khong chi ban co.
+            "turnTimeLimit": TURN_TIME_LIMIT_SECONDS,
+            "turnTimeLeft": self._turn_time_left(room),
         }
+        if room.reconnect_deadline is not None:
+            payload["waitingForPlayerId"] = room.disconnected_player
+            payload["reconnectTimeLeft"] = max(
+                0, int(round(room.reconnect_deadline - self.clock()))
+            )
+        return payload
 
     def _game_result_deliveries(
-        self, room_id: str, winner_id: str | None, recipients: list[str]
+        self,
+        room_id: str,
+        winner_id: str | None,
+        recipients: list[str],
+        *,
+        reason: str | None = None,
     ) -> list[dict[str, Any]]:
         deliveries = []
         for recipient_id in recipients:
@@ -624,6 +807,9 @@ class MessageHandler:
                     "result": "win" if recipient_id == winner_id else "lose",
                     "winnerId": winner_id,
                 }
+            # timeout | disconnect | forfeit — de client noi ro vi sao van ket thuc.
+            if reason is not None:
+                payload["reason"] = reason
             deliveries.append(self._targeted([recipient_id], payload))
         return deliveries
 

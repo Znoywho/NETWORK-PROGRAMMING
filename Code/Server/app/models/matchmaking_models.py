@@ -38,6 +38,12 @@ class Room:
     players_left: set = field(default_factory=set)
     created_at: float = field(default_factory=time.time)
 
+    # Ba moc thoi gian duoi day do MessageHandler dat, do bang time.monotonic()
+    # chu khong phai time.time(): dong ho don dieu, khong nhay khi may doi gio.
+    turn_deadline: float | None = None  # het han suy nghi cua luot hien tai
+    disconnected_player: str | None = None  # nguoi choi dang mat ket noi
+    reconnect_deadline: float | None = None  # han chot de nguoi do quay lai
+
     def get_player_id_by_turn(self, turn: int) -> str | None:
         if turn == 1:
             return self.player_x

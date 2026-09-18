@@ -25,6 +25,9 @@ namespace CaroClient.Core
         public event Action<InviteResultMessage>? OnInviteResult;
         public event Action<InviteRejectedMessage>? OnInviteRejected;
         public event Action<LeaveRoomResultMessage>? OnLeaveRoomResult;
+        public event Action<MatchListMessage>? OnMatchListReceived;
+        public event Action<PlayerDisconnectedMessage>? OnPlayerDisconnected;
+        public event Action<PlayerReconnectedMessage>? OnPlayerReconnected;
         public event Action<ErrorMessage>? OnErrorReceived;
 
         /// <summary>PlayerId do server cấp sau khi login thành công.</summary>
@@ -70,6 +73,10 @@ namespace CaroClient.Core
                 Row = row,
                 Col = col
             });
+
+        /// <summary>Xin danh sách các trận đang diễn ra để chọn phòng khán giả.</summary>
+        public Task GetMatchListAsync()
+            => SendAsync(new GetMatchListMessage());
 
         public Task SpectateAsync(string roomId)
             => SendAsync(new SpectateMessage { RoomId = roomId });
@@ -141,6 +148,21 @@ namespace CaroClient.Core
                     case "invite_rejected":
                         var rejected = Deserialize<InviteRejectedMessage>(json);
                         if (rejected != null) OnInviteRejected?.Invoke(rejected);
+                        break;
+
+                    case "match_list":
+                        var matches = Deserialize<MatchListMessage>(json);
+                        if (matches != null) OnMatchListReceived?.Invoke(matches);
+                        break;
+
+                    case "player_disconnected":
+                        var gone = Deserialize<PlayerDisconnectedMessage>(json);
+                        if (gone != null) OnPlayerDisconnected?.Invoke(gone);
+                        break;
+
+                    case "player_reconnected":
+                        var back = Deserialize<PlayerReconnectedMessage>(json);
+                        if (back != null) OnPlayerReconnected?.Invoke(back);
                         break;
 
                     case "leave_room_result":
