@@ -8,4 +8,4 @@
 - Người dùng có thể xem danh sách các trận đấu đang diễn ra và tham gia phòng với vai trò khán giả.
 - Khán giả vào giữa trận phải nhận đầy đủ trạng thái hiện tại, sau đó nhận các cập nhật bàn chơi và thời gian theo thời gian thực.
 - Server phải phân biệt vai trò người chơi và khán giả; khán giả chỉ được xem, không được gửi nước đi hoặc thay đổi trạng thái trận đấu.
-- Khán giả có thể rời phòng mà không ảnh hưởng đến trận đấu."				
+- Khán giả có thể rời phòng mà không ảnh hưởng đến trận đấu.

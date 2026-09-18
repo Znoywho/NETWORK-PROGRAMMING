@@ -1,329 +1,341 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Caro WebSocket Message Schema",
-  "description": "Schema for messages exchanged between the Caro client and server.",
+  "title": "Caro Socket Message Schema",
+  "description": "Message trao doi giua client va server qua TCP socket. Moi message duoc dong khung: 4 byte big-endian ghi do dai, tiep theo la than JSON ma hoa UTF-8. Xem Extra/network-protocol.md de biet chi tiet framing va cach server chon nguoi nhan.",
+
   "oneOf": [
-    {
-      "$ref": "#/$defs/login"
-    },
-    {
-      "$ref": "#/$defs/online_players"
-    },
-    {
-      "$ref": "#/$defs/invite"
-    },
-    {
-      "$ref": "#/$defs/accept_invite"
-    },
-    {
-      "$ref": "#/$defs/reject_invite"
-    },
-    {
-      "$ref": "#/$defs/make_move"
-    },
-    {
-      "$ref": "#/$defs/game_state"
-    },
-    {
-      "$ref": "#/$defs/game_result"
-    },
-    {
-      "$ref": "#/$defs/spectate"
-    },
-    {
-      "$ref": "#/$defs/leave_room"
-    },
-    {
-      "$ref": "#/$defs/error"
-    }
+    { "$ref": "#/$defs/clientToServer" },
+    { "$ref": "#/$defs/serverToClient" }
   ],
+
   "$defs": {
-    "login": {
+
+    "clientToServer": {
+      "description": "Message client gui len server.",
+      "oneOf": [
+        { "$ref": "#/$defs/login_request" },
+        { "$ref": "#/$defs/create_user_request" },
+        { "$ref": "#/$defs/online_players_request" },
+        { "$ref": "#/$defs/invite_request" },
+        { "$ref": "#/$defs/accept_invite" },
+        { "$ref": "#/$defs/reject_invite" },
+        { "$ref": "#/$defs/make_move" },
+        { "$ref": "#/$defs/spectate" },
+        { "$ref": "#/$defs/leave_room" }
+      ]
+    },
+
+    "serverToClient": {
+      "description": "Message server gui ve client.",
+      "oneOf": [
+        { "$ref": "#/$defs/login_response" },
+        { "$ref": "#/$defs/create_user_response" },
+        { "$ref": "#/$defs/online_players_response" },
+        { "$ref": "#/$defs/invite_notification" },
+        { "$ref": "#/$defs/invite_result" },
+        { "$ref": "#/$defs/invite_rejected" },
+        { "$ref": "#/$defs/reject_invite_result" },
+        { "$ref": "#/$defs/leave_room_result" },
+        { "$ref": "#/$defs/game_state" },
+        { "$ref": "#/$defs/game_result" },
+        { "$ref": "#/$defs/error" }
+      ]
+    },
+
+    "playerId": {
+      "description": "Khoa chinh users.id ben database, gui di duoi dang chuoi so.",
+      "type": "string",
+      "minLength": 1
+    },
+
+    "roomId": {
+      "description": "Khoa chinh matches.id ben database, dung lam room_id.",
+      "type": "string",
+      "minLength": 1
+    },
+
+    "login_request": {
+      "description": "Dang nhap. Server tra ve login_response, dong thoi broadcast online_players cho moi nguoi.",
       "type": "object",
       "properties": {
-        "type": {
-          "const": "login"
-        },
-        "username": {
-          "type": "string",
-          "minLength": 1
-        },
-        "password": {
-          "type": "string",
-          "minLength": 10
-        },
-
-        "playerId": {
-          "type": "string",
-          "minLength": 1
-        }
+        "type": { "const": "login" },
+        "username": { "type": "string", "minLength": 1 },
+        "password": { "type": "string" }
       },
-      "required": [
-        "type",
-        "username"
-      ],
+      "required": ["type", "username", "password"],
       "additionalProperties": false
     },
-    "online_players": {
+
+    "login_response": {
       "type": "object",
       "properties": {
-        "type": {
-          "const": "online_players"
-        },
+        "type": { "const": "login" },
+        "username": { "type": "string", "minLength": 1 },
+        "playerId": { "$ref": "#/$defs/playerId" }
+      },
+      "required": ["type", "username", "playerId"],
+      "additionalProperties": false
+    },
+
+    "create_user_request": {
+      "description": "Dang ky tai khoan moi. Mat khau toi thieu 10 ky tu, username toi thieu 3 ky tu (rang buoc chk_users_username_len ben database).",
+      "type": "object",
+      "properties": {
+        "type": { "const": "create_user" },
+        "username": { "type": "string", "minLength": 3, "maxLength": 32 },
+        "password": { "type": "string", "minLength": 10 }
+      },
+      "required": ["type", "username", "password"],
+      "additionalProperties": false
+    },
+
+    "create_user_response": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "create_user" },
+        "username": { "type": "string", "minLength": 1 },
+        "playerId": { "$ref": "#/$defs/playerId" }
+      },
+      "required": ["type", "username", "playerId"],
+      "additionalProperties": false
+    },
+
+    "online_players_request": {
+      "description": "Xin danh sach nguoi choi dang online.",
+      "type": "object",
+      "properties": {
+        "type": { "const": "online_players" }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+
+    "online_players_response": {
+      "description": "Server cung tu gui message nay (broadcast) moi khi danh sach online thay doi.",
+      "type": "object",
+      "properties": {
+        "type": { "const": "online_players" },
         "players": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "playerId": {
-                "type": "string"
-              },
-              "username": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string"
-              }
+              "playerId": { "$ref": "#/$defs/playerId" },
+              "username": { "type": "string" },
+              "status": { "type": "string", "enum": ["idle", "playing", "spectating"] }
             },
-            "required": [
-              "playerId",
-              "username",
-              "status"
-            ],
+            "required": ["playerId", "username", "status"],
             "additionalProperties": false
           }
         }
       },
-      "required": [
-        "type",
-        "players"
-      ],
+      "required": ["type", "players"],
       "additionalProperties": false
     },
-    "invite": {
+
+    "invite_request": {
+      "description": "Gui loi moi thach dau. inviteId do client tu sinh.",
       "type": "object",
       "properties": {
-        "type": {
-          "const": "invite"
-        },
-        "toPlayerId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "inviteId": {
-          "type": "string",
-          "minLength": 1
-        }
+        "type": { "const": "invite" },
+        "inviteId": { "type": "string", "minLength": 1 },
+        "toPlayerId": { "$ref": "#/$defs/playerId" }
       },
-      "required": [
-        "type",
-        "inviteId",
-        "toPlayerId"
-      ],
+      "required": ["type", "inviteId", "toPlayerId"],
       "additionalProperties": false
     },
+
+    "invite_notification": {
+      "description": "Server bao cho nguoi duoc moi. Cung type 'invite' nhung khac truong voi invite_request.",
+      "type": "object",
+      "properties": {
+        "type": { "const": "invite" },
+        "inviteId": { "type": "string", "minLength": 1 },
+        "fromPlayerId": { "$ref": "#/$defs/playerId" },
+        "fromUsername": { "type": "string" }
+      },
+      "required": ["type", "inviteId", "fromPlayerId", "fromUsername"],
+      "additionalProperties": false
+    },
+
+    "invite_result": {
+      "description": "Xac nhan cho nguoi gui loi moi. That bai thi server tra error thay vi message nay.",
+      "type": "object",
+      "properties": {
+        "type": { "const": "invite_result" },
+        "success": { "const": true },
+        "inviteId": { "type": "string", "minLength": 1 },
+        "toPlayerId": { "$ref": "#/$defs/playerId" }
+      },
+      "required": ["type", "success", "inviteId", "toPlayerId"],
+      "additionalProperties": false
+    },
+
     "accept_invite": {
+      "description": "Chap nhan loi moi. Server tao hang matches, mo phong, roi gui game_state cho ca hai nguoi choi.",
       "type": "object",
       "properties": {
-        "type": {
-          "const": "accept_invite"
-        },
-        "inviteId": {
-          "type": "string",
-          "minLength": 1
-        }
+        "type": { "const": "accept_invite" },
+        "inviteId": { "type": "string", "minLength": 1 }
       },
-      "required": [
-        "type",
-        "inviteId"
-      ],
+      "required": ["type", "inviteId"],
       "additionalProperties": false
     },
+
     "reject_invite": {
       "type": "object",
       "properties": {
-        "type": {
-          "const": "reject_invite"
-        },
-        "inviteId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "reason": {
-          "type": "string"
-        }
+        "type": { "const": "reject_invite" },
+        "inviteId": { "type": "string", "minLength": 1 }
       },
-      "required": [
-        "type",
-        "inviteId"
-      ],
+      "required": ["type", "inviteId"],
       "additionalProperties": false
     },
+
+    "reject_invite_result": {
+      "description": "Xac nhan cho nguoi tu choi.",
+      "type": "object",
+      "properties": {
+        "type": { "const": "reject_invite_result" },
+        "success": { "type": "boolean" },
+        "from": { "$ref": "#/$defs/playerId" },
+        "to": { "$ref": "#/$defs/playerId" },
+        "reason": { "type": "string" }
+      },
+      "required": ["type", "success"],
+      "additionalProperties": false
+    },
+
+    "invite_rejected": {
+      "description": "Server bao cho nguoi gui loi moi biet loi moi bi tu choi.",
+      "type": "object",
+      "properties": {
+        "type": { "const": "invite_rejected" },
+        "inviteId": { "type": "string", "minLength": 1 },
+        "byPlayerId": { "$ref": "#/$defs/playerId" }
+      },
+      "required": ["type", "inviteId", "byPlayerId"],
+      "additionalProperties": false
+    },
+
     "make_move": {
+      "description": "Danh mot nuoc co. playerId phai trung voi nguoi da dang nhap tren ket noi nay, neu khong server tra error FORBIDDEN.",
       "type": "object",
       "properties": {
-        "type": {
-          "const": "make_move"
-        },
-        "room_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "playerId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "row": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "col": {
-          "type": "integer",
-          "minimum": 0
-        }
+        "type": { "const": "make_move" },
+        "room_id": { "$ref": "#/$defs/roomId" },
+        "playerId": { "$ref": "#/$defs/playerId" },
+        "row": { "type": "integer", "minimum": 0 },
+        "col": { "type": "integer", "minimum": 0 }
       },
-      "required": [
-        "type",
-        "room_id",
-        "playerId",
-        "row",
-        "col"
-      ],
+      "required": ["type", "room_id", "playerId", "row", "col"],
       "additionalProperties": false
     },
-    "game_state": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "const": "game_state"
-        },
-        "room_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "board": {
-          "type": "array",
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "enum": [
-                0,
-                1,
-                2
-              ]
-            }
-          }
-        },
-        "currentPlayerId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "status": {
-          "type": "string",
-          "enum": [
-            "waiting",
-            "playing",
-            "finished"
-          ]
-        }
-      },
-      "required": [
-        "type",
-        "room_id",
-        "board",
-        "currentPlayerId",
-        "status"
-      ],
-      "additionalProperties": false
-    },
-    "game_result": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "const": "game_result"
-        },
-        "room_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "result": {
-          "type": "string",
-          "enum": [
-            "win",
-            "lose",
-            "draw"
-          ]
-        },
-        "winnerId": {
-          "type": "string",
-          "minLength": 1
-        }
-      },
-      "required": [
-        "type",
-        "room_id",
-        "result"
-      ],
-      "additionalProperties": false
-    },
+
     "spectate": {
+      "description": "Vao xem mot tran dau. Server tra game_state day du cua tran do.",
       "type": "object",
       "properties": {
-        "type": {
-          "const": "spectate"
-        },
-        "room_id": {
-          "type": "string",
-          "minLength": 1
-        }
+        "type": { "const": "spectate" },
+        "room_id": { "$ref": "#/$defs/roomId" }
       },
-      "required": [
-        "type",
-        "room_id"
-      ],
+      "required": ["type", "room_id"],
       "additionalProperties": false
     },
+
     "leave_room": {
       "type": "object",
       "properties": {
-        "type": {
-          "const": "leave_room"
-        },
-        "room_id": {
-          "type": "string",
-          "minLength": 1
-        }
+        "type": { "const": "leave_room" },
+        "room_id": { "$ref": "#/$defs/roomId" }
       },
-      "required": [
-        "type",
-        "room_id"
-      ],
+      "required": ["type", "room_id"],
       "additionalProperties": false
     },
-    "error": {
+
+    "leave_room_result": {
+      "description": "winnerId chi co khi nguoi choi bo tran dang dien ra: doi thu duoc xu thang.",
       "type": "object",
       "properties": {
-        "type": {
-          "const": "error"
+        "type": { "const": "leave_room_result" },
+        "success": { "const": true },
+        "role": { "type": "string", "enum": ["player", "spectator"] },
+        "winnerId": { "$ref": "#/$defs/playerId" }
+      },
+      "required": ["type", "success", "role"],
+      "additionalProperties": false
+    },
+
+    "game_state": {
+      "description": "Trang thai ban co day du. Gui cho ca hai nguoi choi va moi khan gia sau mot nuoc di, luc mo phong, va luc khan gia vao xem giua chung.",
+      "type": "object",
+      "properties": {
+        "type": { "const": "game_state" },
+        "room_id": { "$ref": "#/$defs/roomId" },
+        "board": {
+          "description": "Ma tran 15x15. 0 = o trong, 1 = quan X, 2 = quan O.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "integer", "enum": [0, 1, 2] }
+          }
         },
+        "currentPlayerId": { "$ref": "#/$defs/playerId" },
+        "status": { "type": "string", "enum": ["waiting", "playing", "finished"] }
+      },
+      "required": ["type", "room_id", "board", "currentPlayerId", "status"],
+      "additionalProperties": false
+    },
+
+    "game_result": {
+      "description": "Ket qua tinh theo goc nhin nguoi nhan: cung mot van, ben thang nhan 'win' con ben thua nhan 'lose'. Database luu x_win/o_win (su that khach quan), server quy doi khi gui. Hoa thi khong co winnerId.",
+      "type": "object",
+      "properties": {
+        "type": { "const": "game_result" },
+        "room_id": { "$ref": "#/$defs/roomId" },
+        "result": { "type": "string", "enum": ["win", "lose", "draw"] },
+        "winnerId": { "$ref": "#/$defs/playerId" }
+      },
+      "required": ["type", "room_id", "result"],
+      "additionalProperties": false
+    },
+
+    "error": {
+      "description": "Server tra ve khi message khong hop le hoac hanh dong bi tu choi. Khong bao gio dong ket noi vi mot message sai.",
+      "type": "object",
+      "properties": {
+        "type": { "const": "error" },
         "code": {
           "type": "string",
-          "minLength": 1
+          "enum": [
+            "ALREADY_AUTHENTICATED",
+            "ALREADY_ONLINE",
+            "CELL_OCCUPIED",
+            "DATABASE_ERROR",
+            "FORBIDDEN",
+            "GAME_NOT_ACTIVE",
+            "INVALID_INVITE",
+            "INVALID_MESSAGE",
+            "INVALID_SPECTATE",
+            "INVITE_NOT_FOUND",
+            "INVITE_REJECTED",
+            "INVITER_OFFLINE",
+            "MOVE_OUT_OF_BOUNDS",
+            "NOT_YOUR_TURN",
+            "PLAYER_BUSY",
+            "ROOM_ERROR",
+            "ROOM_NOT_FINISHED",
+            "ROOM_NOT_FOUND",
+            "UNAUTHENTICATED",
+            "UNKNOWN_MESSAGE_TYPE",
+            "USER_ALREADY_EXIST",
+            "USER_NOT_EXIST",
+            "WRONG_PASSWORD"
+          ]
         },
-        "message": {
-          "type": "string",
-          "minLength": 1
-        },
-        "details": {
-          "type": "object"
-        }
+        "message": { "type": "string", "minLength": 1 }
       },
-      "required": [
-        "type",
-        "code",
-        "message"
-      ],
+      "required": ["type", "code", "message"],
       "additionalProperties": false
     }
   }
