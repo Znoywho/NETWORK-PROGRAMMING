@@ -20,38 +20,43 @@ Mục tiêu của project là xây dựng một hệ thống chơi Caro theo mô
 ## Kiến trúc hệ thống
 
 - Mô hình: Client-Server.
-- Server: Python, Socket, PostgreSQL.
-- Client: C#/.NET console client trong giai đoạn kiểm thử.
-- Shared: Lưu cấu trúc message/protocol dùng chung giữa client và server.
-- Protocol: TCP/IP message dạng JSON.
+- Server: Python, socket + `selectors` (một luồng duy nhất), SQLAlchemy, PostgreSQL.
+- Client: C#/.NET — thư viện `CaroClient.Core`, giao diện WinForms `Caroclient.UI`, và một client dòng lệnh để kiểm thử.
+- Shared: schema message dùng chung giữa client và server.
+- Protocol: TCP. Mỗi message đóng khung bằng header 4 byte big-endian ghi độ dài, tiếp theo là thân JSON mã hoá UTF-8.
 - Port mặc định của server: `8765`.
-- Port mặc định của PostgreSQL: `5432`.
+- Port PostgreSQL: `5432` trong Docker network, ánh xạ ra host là `5433`.
 
 ```text
 NETPRO/
 ├── Code/
 │   ├── Server/
 │   │   ├── app/
-│   │   │   ├── ai/
-│   │   │   ├── game/
-│   │   │   ├── handlers/
-│   │   │   ├── models/
-│   │   │   ├── network/
+│   │   │   ├── ai/              # chua co noi dung
+│   │   │   ├── game/            # luat co caro, kiem tra thang thua
+│   │   │   ├── handlers/        # xu ly tung loai message
+│   │   │   ├── matchmaking/     # quan ly nguoi choi, phong, loi moi
+│   │   │   ├── models/          # model SQLAlchemy + dataclass trong RAM
+│   │   │   ├── network/         # socket, framing, vong lap selectors
+│   │   │   ├── queue/           # hang doi ghi database + DB writer
+│   │   │   ├── ui/              # man hinh theo doi server trong terminal
 │   │   │   ├── config.py
 │   │   │   ├── db.py
 │   │   │   └── main.py
-│   │   ├── migrations/
-│   │   ├── migrations/
+│   │   ├── migrations/init.sql
 │   │   ├── notebook/
 │   │   ├── tests/
 │   │   ├── Dockerfile
-│   │   ├── docker-compose.yml
 │   │   └── requirements.txt
 │   ├── Client/
-│   │   ├── CaroClient.Core/
-│   │   └── CaroClient.ConsoleTest/
-│   └── Shared/
-│       └── message-schema.json
+│   │   ├── CaroClient.Core/        # ket noi, framing, kieu message
+│   │   ├── Caroclient.UI/          # giao dien WinForms
+│   │   ├── CaroClient.ConsoleTest/ # client dong lenh de kiem thu
+│   │   └── global.json
+│   ├── Shared/
+│   │   └── message-schema.json
+│   ├── docker-compose.yml
+│   └── requirements.md
 ├── DOCX/
 ├── PPTX/
 └── Extra/
@@ -59,35 +64,48 @@ NETPRO/
 
 ## Cấu trúc message
 
-Client và server trao đổi dữ liệu bằng JSON thông qua Socket. Mỗi message nên có trường `type` để xác định loại yêu cầu hoặc sự kiện.
+Client và server trao đổi dữ liệu bằng JSON qua TCP socket. Vì TCP là luồng byte chứ không phải luồng message, mỗi message được dán sẵn header 4 byte ghi độ dài phần thân:
+
+```text
+┌──────────────┬─────────────────────┐
+│ 4 bytes (>I) │  N bytes JSON/UTF-8 │
+└──────────────┴─────────────────────┘
+```
+
+Mỗi message có trường `type` xác định loại yêu cầu hoặc sự kiện.
 
 Ví dụ:
 
 ```json
 {
   "type": "make_move",
-  "matchId": "match-001",
-  "playerId": "player-001",
+  "room_id": "12",
+  "playerId": "3",
   "row": 7,
   "col": 8
 }
 ```
 
-Một số loại message dự kiến:
+Client gửi lên server:
 
-- `login`: người chơi đăng nhập vào server.
-- `online_players`: server trả danh sách người chơi đang online.
-- `invite`: gửi lời mời thách đấu.
-- `accept_invite`: chấp nhận lời mời.
-- `reject_invite`: từ chối lời mời.
-- `make_move`: người chơi đánh một nước cờ.
-- `game_state`: server gửi trạng thái bàn cờ hiện tại.
-- `game_result`: server thông báo kết quả thắng, thua hoặc hòa.
-- `spectate`: khán giả tham gia xem một trận đấu.
-- `leave_room`: người chơi hoặc khán giả rời phòng.
-- `error`: server trả lời khi message không hợp lệ.
+- `login`, `create_user`: đăng nhập và đăng ký tài khoản.
+- `online_players`: xin danh sách người chơi đang online.
+- `invite`, `accept_invite`, `reject_invite`: mời đấu và trả lời lời mời.
+- `make_move`: đánh một nước cờ.
+- `spectate`: vào xem một trận đấu.
+- `leave_room`: rời phòng.
 
-Chi tiết schema dự kiến lưu tại `Code/Shared/message-schema.json`.
+Server gửi về client:
+
+- `login`, `create_user`: kết quả đăng nhập / đăng ký kèm `playerId`.
+- `online_players`: danh sách online (server tự broadcast mỗi khi danh sách đổi).
+- `invite`: báo cho người được mời. `invite_result`, `invite_rejected`, `reject_invite_result`: kết quả lời mời.
+- `game_state`: trạng thái bàn cờ hiện tại.
+- `game_result`: thắng, thua hoặc hòa.
+- `leave_room_result`: kết quả rời phòng.
+- `error`: message không hợp lệ hoặc hành động bị từ chối.
+
+Schema đầy đủ của từng message ở `Code/Shared/message-schema.json`. Giải thích chi tiết cách đóng khung và cách server chọn người nhận ở `Extra/network-protocol.md`.
 
 ## Yêu cầu môi trường
 
@@ -95,15 +113,15 @@ Chi tiết schema dự kiến lưu tại `Code/Shared/message-schema.json`.
 - Python: 3.12 trở lên.
 - .NET SDK: 10.0 theo `Code/Client/global.json`.
 - Docker và Docker Compose để chạy server kèm database.
-- PostgreSQL được chạy thông qua Docker Compose.
+- PostgreSQL 18 được chạy thông qua Docker Compose.
 
-Dependency server hiện tại:
+Dependency server (`Code/Server/requirements.txt`):
 
-- sockets
-- asyncpg
-- python-dotenv
-- psycopg2-binary
-- bcrypt
+- sqlalchemy — ORM và quản lý connection pool
+- psycopg2-binary, asyncpg — driver PostgreSQL
+- bcrypt — băm mật khẩu
+- python-dotenv — đọc file `.env`
+- numpy, pandas, scikit-learn — phục vụ phần AI trong `notebook/`
 
 ## Cài đặt
 
@@ -118,8 +136,8 @@ Cài dependency cho server nếu chạy trực tiếp bằng Python:
 
 ```bash
 cd Code/Server
-python -m venv .venv
-source .venv/bin/activate
+python -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -127,8 +145,8 @@ Trên Windows PowerShell:
 
 ```powershell
 cd Code/Server
-python -m venv .venv
-.venv\Scripts\Activate.ps1
+python -m venv venv
+venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
@@ -136,93 +154,124 @@ pip install -r requirements.txt
 
 ### Server
 
-Server dự kiến chạy bằng Docker Compose:
+File `docker-compose.yml` nằm ở thư mục `Code/`, không phải `Code/Server/`:
 
 ```bash
-cd Code/Server
+cd Code
 docker compose up --build
 ```
 
-Lưu ý: server hiện đang trong giai đoạn khởi tạo. Cần bổ sung source trong `Code/Server/app/` và đảm bảo `docker-compose.yml` trỏ đúng đường dẫn build, file `.env`, và file migration trước khi chạy hoàn chỉnh.
+Lệnh này dựng hai container: `caro-db` (PostgreSQL, tự chạy `migrations/init.sql` lần đầu khởi tạo) và `caro-server` (chỉ khởi động sau khi healthcheck của database qua).
 
-Nếu chạy trực tiếp bằng Python:
+Nếu chạy trực tiếp bằng Python, cần có sẵn một PostgreSQL đang chạy và biến `OUT_CARO_DATABASE_URL` trỏ đúng vào nó:
 
 ```bash
 cd Code/Server
 python -m app.main
 ```
 
+Server lắng nghe ở `0.0.0.0:8765` (khai báo trong `app/main.py`).
+
 ### Client
 
-Client console dùng .NET:
+Giao diện WinForms (chỉ chạy được trên Windows):
+
+```bash
+cd Code/Client/Caroclient.UI
+dotnet run
+```
+
+Client dòng lệnh để kiểm thử kết nối:
 
 ```bash
 cd Code/Client/CaroClient.ConsoleTest
 dotnet run
 ```
 
-Hiện tại client mới ở mức project mẫu để kiểm thử kết nối, chưa hoàn thiện giao diện và luồng chơi.
-
 ## Cấu hình
 
-Các tham số nên cấu hình bằng file `.env` trong `Code/Server/`. Không commit file `.env` lên repository.
-
-Ví dụ biến môi trường:
+Các tham số cấu hình bằng file `.env` trong `Code/Server/`. Không commit file `.env` lên repository.
 
 ```env
-SERVER_HOST=0.0.0.0
-SERVER_PORT=8765
-DATABASE_URL=postgresql://caro_user:caro_pass@db:5432/caro_db
+# Chuoi ket noi khi server chay trong Docker (host la ten service `db`)
+CARO_DB_DOCKER=postgresql://<user>:<password>@db:5432/<database>
+
+# Chuoi ket noi khi chay truc tiep bang Python tren may that
+OUT_CARO_DATABASE_URL=postgresql://<user>:<password>@localhost:5433/<database>
 ```
 
-Thông tin database mặc định trong Docker Compose:
+Thay `<user>`, `<password>`, `<database>` bằng thông tin nhóm tự đặt trong `docker-compose.yml`. Không ghi mật khẩu thật vào tài liệu.
 
-- Database: `caro_db`
-- User: `caro_user`
-- Password: `caro_pass`
-- Host khi chạy trong Docker network: `db`
-- Port: `5432`
+`app/config.py` chọn một trong hai dựa vào biến `RUNNING_IN_DOCKER`, biến này do `docker-compose.yml` tự đặt thành `true` nên không cần khai trong `.env`.
+
+Thông tin database khai trong `docker-compose.yml` (mục `db.environment`):
+
+- Database, user, password: xem trực tiếp trong `docker-compose.yml`
+- Host: `db` khi chạy trong Docker network, `localhost` khi chạy ngoài
+- Port: `5432` trong Docker network, ánh xạ ra host là `5433`
 
 ## Chức năng
 
-- [ ] Client kết nối đến server.
-- [ ] Hiển thị danh sách người chơi đang online.
-- [ ] Gửi lời mời thách đấu.
-- [ ] Chấp nhận hoặc từ chối lời mời.
-- [ ] Tạo phòng đấu và quản lý nhiều trận đấu đồng thời.
-- [ ] Đồng bộ trạng thái bàn cờ theo thời gian thực.
-- [ ] Kiểm tra tính hợp lệ của nước đi.
-- [ ] Kiểm tra kết quả thắng, thua hoặc hòa.
+- [x] Client kết nối đến server.
+- [x] Hiển thị danh sách người chơi đang online.
+- [x] Gửi lời mời thách đấu.
+- [x] Chấp nhận hoặc từ chối lời mời.
+- [x] Tạo phòng đấu và quản lý nhiều trận đấu đồng thời.
+- [x] Đồng bộ trạng thái bàn cờ theo thời gian thực.
+- [x] Kiểm tra tính hợp lệ của nước đi.
+- [x] Kiểm tra kết quả thắng, thua hoặc hòa.
+- [x] Lưu lịch sử và kết quả trận đấu.
+- [x] Cho phép khán giả xem trận đấu đang diễn ra.
+- [x] Phân biệt quyền của người chơi và khán giả.
 - [ ] Giới hạn thời gian suy nghĩ cho mỗi lượt.
 - [ ] Cho phép người chơi kết nối lại trong thời gian cho phép.
-- [ ] Lưu lịch sử và kết quả trận đấu.
-- [ ] Cho phép khán giả xem trận đấu đang diễn ra.
-- [ ] Phân biệt quyền của người chơi và khán giả.
+- [ ] Xem danh sách các trận đang diễn ra để chọn phòng khán giả.
 
 ## Kiểm thử
 
+Test hiện có trong `Code/Server/`:
+
+```bash
+cd Code/Server
+python -m unittest tests.test_message_handler   # dang unittest
+python tests/test_room_cleanup.py               # dang script
+python app/queue/test_queue.py
+python app/queue/test_db_writer.py
+```
+
 Các nhóm kiểm thử dự kiến:
 
-- Functional test: kiểm tra đăng nhập, mời đấu, đánh cờ, kết thúc trận.
+- Functional test: đăng nhập, mời đấu, đánh cờ, kết thúc trận.
 - Test dữ liệu không hợp lệ: message sai format, đánh vào ô đã có quân, đánh sai lượt.
-- Test mất kết nối: client mất kết nối, kết nối lại, rời phòng.
+- Test mất kết nối: client mất kết nối, rời phòng.
 - Stress test: nhiều client kết nối đồng thời.
 - Performance test: đo thời gian phản hồi khi nhiều trận đấu diễn ra cùng lúc.
 
-Bằng chứng kiểm thử, hình ảnh, video demo và log có thể lưu tại `Extra/`.
+Bằng chứng kiểm thử, hình ảnh, video demo và log lưu tại `Extra/`.
+
+## Tài liệu
+
+| Tài liệu | Nội dung |
+|---|---|
+| `Extra/network-protocol.md` | Framing, vòng lặp selectors, vòng đời kết nối, cách chọn người nhận |
+| `Extra/database-schema.md` | Ba bảng, ràng buộc, quan hệ, cách kết nối database |
+| `Extra/queue-event-format.md` | Format event đi qua hàng đợi xuống DB Writer |
+| `Extra/er-diagram-database.mmd` | Sơ đồ ER (mở bằng GitHub hoặc mermaid.live) |
+| `Extra/queue-event-flow.mmd` | Sơ đồ luồng event qua hàng đợi |
+| `Code/Shared/message-schema.json` | Schema JSON của toàn bộ message |
+| `Code/requirements.md` | Yêu cầu đề bài |
 
 ## Demo
 
 - Video demo: cập nhật sau.
 - Slide thuyết trình: `PPTX/`.
 - Báo cáo: `DOCX/`.
-- Tài liệu bổ sung và bằng chứng kiểm thử: `Extra/`.
 
 ## Giới hạn hiện tại
 
-- Server chưa có source chính trong `Code/Server/app/`.
-- Client hiện mới là console project mẫu.
-- Schema message trong `Code/Shared/message-schema.json` chưa hoàn thiện.
-- Migration database trong `Code/Server/migrations/init.sql` chưa có cấu trúc bảng.
-- Chưa có giao diện người dùng hoàn chỉnh.
-- Chưa có test tự động.
+- Chưa có giới hạn thời gian mỗi lượt và chưa cho phép kết nối lại: người chơi rớt mạng giữa trận thì đối thủ được xử thắng ngay.
+- Chưa có message cho client lấy danh sách phòng đang chơi, nên muốn xem trận phải biết trước `room_id`.
+- Chưa chặn trần độ dài frame và chưa có heartbeat — xem mục "Giới hạn hiện tại" trong `Extra/network-protocol.md`.
+- Model `User` trong `app/models/user.py` lệch kiểu thời gian so với `migrations/init.sql`.
+- Chưa có công cụ migration: đổi schema phải xoá volume và tạo lại database từ đầu.
+- Test còn ít và phần lớn viết dạng script, chưa gom về một bộ chạy chung.
