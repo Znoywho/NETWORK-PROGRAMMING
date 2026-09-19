@@ -15,6 +15,9 @@ class InviteManager:
         self._lock = threading.Lock()
 
     def send_invite(self, from_id: str, to_id: str, invite_id: str | None = None) -> dict:
+        if from_id == to_id:
+            return {"success": False,  "reason": "cannot_invite_self"}
+
         target = self.player_manager.get_player(to_id)
 
         if not target:
@@ -42,6 +45,10 @@ class InviteManager:
         if not invite:
             return {"success": False, "reason": "invite_not_found_or_expired"}
 
+        # kiem tra het han moi dau
+        if (time.time() - invite["timestamp"]) > 30:
+            return {"success": False, "reason": "invite_expired"}
+
         room = self.room_manager.create_room(invite["from"], invite["to"])
         room.board_instance = board_factory()
 
@@ -60,3 +67,12 @@ class InviteManager:
             return {"success": False, "reason": "invite_not_found"}
 
         return {"success": True, "from": invite["from"], "to": invite["to"]}
+
+    def is_invite_expired(self, invite_id: str, timeout_seconds: int = 30) -> bool:
+        """ kiem tra loi moi co het han chua ( mac dinh 30s) """
+        with self._lock:
+            invite = self._pending_invites.get(invite_id)
+            if not invite:
+                return True
+            return (time.time() - invite["timestamp"]) > timeout_seconds
+
