@@ -7,13 +7,11 @@ public partial class ProfileForm : Form
     public ProfileForm(
         string username = "Player_01",
         string playerId = "player-001",
-        string rank = "Chưa xếp hạng",
-        int rankPoints = 0)
+        int points = 0)
     {
         InitializeComponent();
         lblUsernameValue.Text = username;
         lblPlayerIdValue.Text = playerId;
-        lblRankValue.Text = rank;
-        lblRankPointsValue.Text = rankPoints.ToString("N0");
+        lblRankPointsValue.Text = points.ToString("N0");
     }
 }

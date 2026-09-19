@@ -28,6 +28,8 @@ namespace Caroclient.UI
 
         /// <summary>Quân mà mình đang chơi: 0 = X, 1 = O. -1 = chưa vào trận.</summary>
         private int mySymbol = -1;
+        private int points;
+        private bool hasPoints;
 
         // Đồng hồ hiển thị: server gửi số giây còn lại trong game_state, client
         // chỉ đếm ngược tại chỗ nên không cần server bắn message mỗi giây.
@@ -61,7 +63,9 @@ namespace Caroclient.UI
 
             WireUpControls();
             ConfigurePlayerInfo();
+            UpdatePointsDisplay(null);
             ChessBoard.DrawChessBoard();
+            ChessBoard.ClearMark();
             ChessBoard.SetInteractive(false);
 
             turnClockTimer.Tick += TurnClockTick;
@@ -101,6 +105,7 @@ namespace Caroclient.UI
             {
                 myPlayerId = auth.PlayerId;
                 Text = $"Caro - {auth.Username} (ID: {auth.PlayerId})";
+                UpdatePointsDisplay(auth.Ranking);
                 Log($"Đăng nhập thành công: {auth.Username} (ID: {auth.PlayerId})");
                 _ = SafeSendAsync(client.GetOnlinePlayersAsync());
             });
@@ -246,26 +251,7 @@ namespace Caroclient.UI
             btnLeaveRoom.Enabled = !isSpectator && state.Status == "playing";
             gbInviteMessage.Visible = false;
 
-            // --- Cập nhật icon X/O và tên dựa theo quân được server giao ---
-            if (!isSpectator && !string.IsNullOrEmpty(myPlayerId))
-            {
-                bool iAmX = state.PlayerXId == myPlayerId;
-                mySymbol = iAmX ? 0 : 1;
-
-                // Đổi icon giữa bảng tỉ số sang đúng quân của mình
-                ChessBoard.ShowMark(mySymbol);
-
-                txbPlayerName1.Text = iAmX
-                    ? $"X - {Username}"
-                    : $"O - {Username}";
-                txtPlayerName2.Text = iAmX
-                    ? "O - Đối thủ"
-                    : "X - Đối thủ";
-            }
-            else
-            {
-                txtPlayerName2.Text = isSpectator ? "Đang xem" : "O - Đối thủ";
-            }
+            UpdatePlayerSymbolDisplay(state);
 
             // Khán giả vào giữa trận cũng nhận đúng đồng hồ này trong game_state.
             waitingForPlayerId = state.WaitingForPlayerId;
@@ -357,6 +343,20 @@ namespace Caroclient.UI
             {
                 PlayerTwoWins++;
                 txtScorePlayer2.Text = PlayerTwoWins.ToString();
+            }
+
+            if (result.Ranking is int newRankPoints)
+            {
+                int previousPoints = points;
+                bool pointsWereKnown = hasPoints;
+                UpdatePointsDisplay(newRankPoints);
+
+                if (pointsWereKnown)
+                {
+                    int change = newRankPoints - previousPoints;
+                    string sign = change >= 0 ? "+" : string.Empty;
+                    Log($"Điểm cập nhật: {newRankPoints:N0} ({sign}{change:N0}).");
+                }
             }
 
             Log($"Kết quả phòng {result.RoomId}: {text}");
@@ -612,11 +612,51 @@ namespace Caroclient.UI
 
         private void ConfigurePlayerInfo()
         {
-            // X là người chơi thứ nhất, O là người chơi thứ hai.
-            txbPlayerName1.Text = $"X - {Username}";
-            txtPlayerName2.Text = "O - Chưa có đối thủ";
+            txbPlayerName1.Text = Username;
+            txtPlayerName2.Text = "Chưa vào trận";
             txtScorePlayer1.Text = "0";
             txtScorePlayer2.Text = "0";
+        }
+
+        /// <summary>
+        /// Server là nguồn xác định duy nhất cho quân của người chơi. Vì vậy icon
+        /// và tên chỉ đổi sau khi nhận game_state, không đoán từ thứ tự mời đấu.
+        /// </summary>
+        private void UpdatePlayerSymbolDisplay(GameStateMessage state)
+        {
+            bool iAmX = !isSpectator && state.PlayerXId == myPlayerId;
+            bool iAmO = !isSpectator && state.PlayerOId == myPlayerId;
+
+            if (!iAmX && !iAmO)
+            {
+                mySymbol = -1;
+                ChessBoard.ClearMark();
+                pctbMark.AccessibleDescription = "Chưa được gán quân cờ.";
+                txbPlayerName1.Text = isSpectator ? "Đang xem trận" : Username;
+                txtPlayerName2.Text = isSpectator ? "Khán giả" : "Chưa vào trận";
+                return;
+            }
+
+            mySymbol = iAmX ? 0 : 1;
+            string myMark = iAmX ? "X" : "O";
+            string opponentMark = iAmX ? "O" : "X";
+            ChessBoard.ShowMark(mySymbol);
+            pctbMark.AccessibleDescription = $"Bạn đang cầm quân {myMark}.";
+            txbPlayerName1.Text = $"{myMark} - {Username}";
+            txtPlayerName2.Text = $"{opponentMark} - Đối thủ";
+        }
+
+        private void UpdatePointsDisplay(int? updatedPoints)
+        {
+            hasPoints = updatedPoints.HasValue;
+            if (!updatedPoints.HasValue)
+            {
+                lblRankPointsDisplay.Text = "Đang tải...";
+                return;
+            }
+
+            points = updatedPoints.Value;
+            lblRankPointsDisplay.Text = $"{points:N0} điểm";
         }
 
         private void ChessBoard_GameEnded(int winnerIndex)
@@ -737,7 +777,7 @@ namespace Caroclient.UI
 
         private void hồSơCủaTôiToolStripMenuItem_Click(object? sender, EventArgs e)
         {
-            using var profileForm = new ProfileForm(Username, myPlayerId ?? "-");
+            using var profileForm = new ProfileForm(Username, myPlayerId ?? "-", points);
             profileForm.ShowDialog(this);
         }
 
