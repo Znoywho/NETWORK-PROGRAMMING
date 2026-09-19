@@ -76,10 +76,11 @@ namespace Caroclient.UI
         /// </summary>
         private void BuildOnlineUi()
         {
-            ClientSize = new Size(1190, 600);
-
+            // ClientSize da duoc dat trong Form1.Designer.cs (1190x600) de
+            // designer va runtime dung chung mot kich thuoc goc cho Anchor.
             lblTurnClock = new Label
             {
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 AutoSize = false,
                 Location = new Point(OnlinePanelX, 70),
                 Size = new Size(320, 28),
@@ -90,6 +91,7 @@ namespace Caroclient.UI
 
             var lblOnline = new Label
             {
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 AutoSize = true,
                 Location = new Point(OnlinePanelX, 112),
                 Text = "Người chơi online"
@@ -97,6 +99,7 @@ namespace Caroclient.UI
 
             lstOnlinePlayers = new ListBox
             {
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Location = new Point(OnlinePanelX, 135),
                 Size = new Size(320, 150)
             };
@@ -104,6 +107,7 @@ namespace Caroclient.UI
 
             btnRefreshPlayers = new Button
             {
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Location = new Point(OnlinePanelX, 292),
                 Size = new Size(100, 29),
                 Text = "Làm mới"
@@ -112,6 +116,7 @@ namespace Caroclient.UI
 
             var btnInvitePlayer = new Button
             {
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Location = new Point(OnlinePanelX + 108, 292),
                 Size = new Size(100, 29),
                 Text = "Mời đấu"
@@ -120,6 +125,7 @@ namespace Caroclient.UI
 
             btnSpectate2 = new Button
             {
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Location = new Point(OnlinePanelX + 216, 292),
                 Size = new Size(104, 29),
                 Text = "Xem trận"
@@ -128,6 +134,7 @@ namespace Caroclient.UI
 
             gbInviteMessage = new GroupBox
             {
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Location = new Point(OnlinePanelX, 331),
                 Size = new Size(320, 100),
                 Text = "Lời mời",
@@ -162,6 +169,7 @@ namespace Caroclient.UI
 
             btnSurrender = new Button
             {
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Location = new Point(OnlinePanelX, 441),
                 Size = new Size(320, 29),
                 Text = "Rời phòng / Đầu hàng",
@@ -171,6 +179,7 @@ namespace Caroclient.UI
 
             rtbLog = new RichTextBox
             {
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right,
                 Location = new Point(OnlinePanelX, 480),
                 Size = new Size(320, 100),
                 ReadOnly = true
@@ -748,6 +757,11 @@ namespace Caroclient.UI
 
         private async void Form1_Load(object sender, EventArgs e)
         {
+            // Chot kich thuoc khoi dong lam min: keo nho hon nua thi bang co
+            // (neo ca trai lan phai) bi co ve 0 va bien mat. Lay Size o Load
+            // de da tinh ca DPI scaling, khoi phai hardcode con so.
+            MinimumSize = Size;
+
             await ConnectAndLoginAsync();
         }
 

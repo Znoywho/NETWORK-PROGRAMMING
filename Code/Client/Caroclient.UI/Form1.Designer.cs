@@ -54,17 +54,21 @@ partial class Form1
         // 
         // pnlChessBoard
         // 
+        pnlChessBoard.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         pnlChessBoard.BackColor = SystemColors.ButtonFace;
         pnlChessBoard.BackgroundImage = Properties.Resources.abfa03f6_6d65_453f_9081_0ae2d9165caa;
+        pnlChessBoard.BackgroundImageLayout = ImageLayout.Stretch;
         pnlChessBoard.ForeColor = SystemColors.ButtonHighlight;
         pnlChessBoard.Location = new Point(187, 112);
         pnlChessBoard.Name = "pnlChessBoard";
-        pnlChessBoard.Size = new Size(424, 460);
+        // 15 o x 30px = 450. De 424 thi ban co bi cat mat 26px ben phai.
+        pnlChessBoard.Size = new Size(450, 450);
         pnlChessBoard.TabIndex = 0;
         pnlChessBoard.Paint += pnlChessBoard_Paint;
         // 
         // ptbTitle
         // 
+        ptbTitle.Anchor = AnchorStyles.Top;
         ptbTitle.Image = Properties.Resources.title;
         ptbTitle.Location = new Point(287, 31);
         ptbTitle.Name = "ptbTitle";
@@ -75,7 +79,7 @@ partial class Form1
         // 
         // btnInvite
         // 
-        btnInvite.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        btnInvite.Anchor = AnchorStyles.Top | AnchorStyles.Left;
         btnInvite.Location = new Point(24, 214);
         btnInvite.Name = "btnInvite";
         btnInvite.Size = new Size(129, 29);
@@ -86,7 +90,7 @@ partial class Form1
         // 
         // btnSpectate
         // 
-        btnSpectate.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        btnSpectate.Anchor = AnchorStyles.Top | AnchorStyles.Left;
         btnSpectate.Location = new Point(24, 286);
         btnSpectate.Name = "btnSpectate";
         btnSpectate.Size = new Size(129, 29);
@@ -97,7 +101,7 @@ partial class Form1
         // 
         // btnLeave
         // 
-        btnLeave.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        btnLeave.Anchor = AnchorStyles.Top | AnchorStyles.Left;
         btnLeave.Location = new Point(24, 425);
         btnLeave.Name = "btnLeave";
         btnLeave.Size = new Size(129, 29);
@@ -107,6 +111,7 @@ partial class Form1
         // 
         // txbPlayerName1
         // 
+        txbPlayerName1.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         txbPlayerName1.Location = new Point(684, 134);
         txbPlayerName1.Name = "txbPlayerName1";
         txbPlayerName1.ReadOnly = true;
@@ -115,6 +120,7 @@ partial class Form1
         // 
         // pctbMark
         // 
+        pctbMark.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         pctbMark.Location = new Point(693, 227);
         pctbMark.Name = "pctbMark";
         pctbMark.Size = new Size(106, 88);
@@ -178,7 +184,7 @@ partial class Form1
         // 
         // button1
         // 
-        button1.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        button1.Anchor = AnchorStyles.Top | AnchorStyles.Left;
         button1.Location = new Point(24, 151);
         button1.Name = "button1";
         button1.Size = new Size(129, 29);
@@ -189,7 +195,7 @@ partial class Form1
         // 
         // button2
         // 
-        button2.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        button2.Anchor = AnchorStyles.Top | AnchorStyles.Left;
         button2.Location = new Point(24, 358);
         button2.Name = "button2";
         button2.Size = new Size(129, 29);
@@ -200,6 +206,7 @@ partial class Form1
         // 
         // txtPlayerName2
         // 
+        txtPlayerName2.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         txtPlayerName2.Location = new Point(684, 341);
         txtPlayerName2.Name = "txtPlayerName2";
         txtPlayerName2.ReadOnly = true;
@@ -208,6 +215,7 @@ partial class Form1
         // 
         // txtScorePlayer2
         // 
+        txtScorePlayer2.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         txtScorePlayer2.Location = new Point(684, 377);
         txtScorePlayer2.Name = "txtScorePlayer2";
         txtScorePlayer2.ReadOnly = true;
@@ -217,6 +225,7 @@ partial class Form1
         // 
         // txtScorePlayer1
         // 
+        txtScorePlayer1.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         txtScorePlayer1.Location = new Point(684, 167);
         txtScorePlayer1.Name = "txtScorePlayer1";
         txtScorePlayer1.ReadOnly = true;
@@ -230,7 +239,10 @@ partial class Form1
         AutoScaleMode = AutoScaleMode.Font;
         BackColor = SystemColors.ControlLight;
         BackgroundImage = Properties.Resources.abfa03f6_6d65_453f_9081_0ae2d9165caa;
-        ClientSize = new Size(858, 572);
+        BackgroundImageLayout = ImageLayout.Stretch;
+        // Khop voi kich thuoc that luc chay: BuildOnlineUi dung panel online
+        // toi x=1160, de 858 thi designer va runtime lech nhau, Anchor tinh sai.
+        ClientSize = new Size(1190, 600);
         Controls.Add(button1);
         Controls.Add(button2);
         Controls.Add(ptbTitle);
