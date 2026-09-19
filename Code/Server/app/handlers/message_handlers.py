@@ -779,6 +779,8 @@ class MessageHandler:
             "room_id": room.room_id,
             "board": [[0 if cell == "." else 1 if cell == "X" else 2 for cell in row] for row in board.grid],
             "currentPlayerId": current_player_id or room.player_x,
+            "playerXId": room.player_x,
+            "playerOId": room.player_o,
             "status": room.status.value,
             # Khan gia vao giua tran cung nhan duoc dong ho, khong chi ban co.
             "turnTimeLimit": TURN_TIME_LIMIT_SECONDS,
