@@ -13,6 +13,7 @@ namespace Caroclient.UI
         public string Username { get; }
         public string Password { get; }
         public string ServerAddress { get; }
+        private readonly bool registerRequested;
 
         private readonly CaroConnection connection = new();
         private readonly GameClient client;
@@ -41,17 +42,18 @@ namespace Caroclient.UI
         private int PlayerTwoWins;
         #endregion
 
-        public Form1() : this("Player_01", "", "tcp://localhost:8765")
+        public Form1() : this("Player_01", "", "tcp://localhost:8765", false)
         {
         }
 
-        public Form1(string username, string password, string serverAddress)
+        public Form1(string username, string password, string serverAddress, bool registerRequested = false)
         {
             InitializeComponent();
 
             Username = username;
             Password = password;
             ServerAddress = serverAddress;
+            this.registerRequested = registerRequested;
             Text = $"Caro - {Username}";
 
             ChessBoard = new ChessBoardManager(pnlChessBoard, txbPlayerName1, pctbMark)
@@ -108,6 +110,12 @@ namespace Caroclient.UI
                 UpdatePointsDisplay(auth.Ranking);
                 Log($"Đăng nhập thành công: {auth.Username} (ID: {auth.PlayerId})");
                 _ = SafeSendAsync(client.GetOnlinePlayersAsync());
+            });
+
+            client.OnUserCreated += auth => RunOnUi(() =>
+            {
+                Log($"Đã tạo tài khoản {auth.Username}. Đang đăng nhập...");
+                _ = SafeSendAsync(client.LoginAsync(Username, Password));
             });
 
             client.OnOnlinePlayersReceived += message => RunOnUi(() =>
@@ -201,7 +209,7 @@ namespace Caroclient.UI
                 Log($"[{error.Code}] {error.Message}");
 
                 // Các lỗi chặn đăng nhập thì cần báo rõ ràng cho người dùng.
-                if (error.Code is "USER_NOT_EXIST" or "WRONG_PASSWORD" or "ALREADY_ONLINE" or "DATABASE_ERROR")
+                if (error.Code is "USER_NOT_EXIST" or "WRONG_PASSWORD" or "ALREADY_ONLINE" or "USER_ALREADY_EXIST" or "INVALID_MESSAGE" or "DATABASE_ERROR")
                 {
                     MessageBox.Show(error.Message, "Không đăng nhập được", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
@@ -295,12 +303,12 @@ namespace Caroclient.UI
             lblTurnClock.Visible = true;
             if (waitingForPlayerId is not null)
             {
-                lblTurnClock.ForeColor = Color.DarkOrange;
+                lblTurnClock.ForeColor = Color.Gold;
                 lblTurnClock.Text = $"Chờ {waitingForPlayerId} kết nối lại: {reconnectSecondsLeft}s";
                 return;
             }
 
-            lblTurnClock.ForeColor = turnSecondsLeft <= 5 ? Color.Firebrick : Color.Black;
+            lblTurnClock.ForeColor = turnSecondsLeft <= 5 ? Color.Tomato : Color.White;
             lblTurnClock.Text = $"Thời gian suy nghĩ: {turnSecondsLeft}s";
         }
 
@@ -726,7 +734,15 @@ namespace Caroclient.UI
                 return;
             }
 
-            await SafeSendAsync(client.LoginAsync(Username, Password));
+            if (registerRequested)
+            {
+                Log($"Đang tạo tài khoản {Username}...");
+                await SafeSendAsync(client.CreateUserAsync(Username, Password));
+            }
+            else
+            {
+                await SafeSendAsync(client.LoginAsync(Username, Password));
+            }
         }
 
 

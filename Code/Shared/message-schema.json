@@ -83,12 +83,12 @@
     },
 
     "create_user_request": {
-      "description": "Dang ky tai khoan moi. Mat khau toi thieu 10 ky tu, username toi thieu 3 ky tu (rang buoc chk_users_username_len ben database).",
+      "description": "Dang ky tai khoan moi. Mat khau toi thieu 6 ky tu, username toi thieu 3 ky tu (rang buoc chk_users_username_len ben database).",
       "type": "object",
       "properties": {
         "type": { "const": "create_user" },
         "username": { "type": "string", "minLength": 3, "maxLength": 32 },
-        "password": { "type": "string", "minLength": 10 }
+        "password": { "type": "string", "minLength": 6 }
       },
       "required": ["type", "username", "password"],
       "additionalProperties": false
@@ -392,7 +392,7 @@
           "enum": ["timeout", "disconnect", "forfeit"]
         },
         "ranking": {
-          "description": "Diem moi cua nguoi nhan, chi co sau van ket thuc binh thuong tren ban co.",
+          "description": "Diem moi cua nguoi nhan sau van ket thuc tren ban co hoac do het thoi gian luot.",
           "type": "integer"
         }
       },

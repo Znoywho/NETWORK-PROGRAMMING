@@ -324,7 +324,8 @@ public class GameResultMessage
 
     /// <summary>
     /// Điểm mới sau một ván kết thúc bình thường. Không có khi ván kết thúc do
-    /// timeout, mất kết nối hoặc bỏ trận vì các trường hợp đó không tính điểm.
+    /// mất kết nối hoặc bỏ trận vì các trường hợp đó không tính điểm. Kết quả
+    /// timeout vẫn có ranking vì hết thời gian được tính là một ván thắng/thua.
     /// </summary>
     [JsonPropertyName("ranking")]
     public int? Ranking { get; set; }
