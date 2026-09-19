@@ -7,6 +7,7 @@ public partial class LoginForm : Form
     public string Username { get; private set; } = string.Empty;
     public string Password { get; private set; } = string.Empty;
     public string ServerAddress { get; private set; } = string.Empty;
+    public bool RegisterRequested { get; private set; }
 
     public LoginForm()
     {
@@ -19,6 +20,16 @@ public partial class LoginForm : Form
     }
 
     private void btnLogin_Click(object? sender, EventArgs e)
+    {
+        Submit(register: false);
+    }
+
+    private void btnRegister_Click(object? sender, EventArgs e)
+    {
+        Submit(register: true);
+    }
+
+    private void Submit(bool register)
     {
         string username = txtLoginUsername.Text.Trim();
         string password = txtPassword.Text;
@@ -38,6 +49,13 @@ public partial class LoginForm : Form
             return;
         }
 
+        if (register && password.Length < 6)
+        {
+            MessageBox.Show("Mật khẩu đăng ký phải có ít nhất 6 ký tự.", "Mật khẩu chưa hợp lệ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            txtPassword.Focus();
+            return;
+        }
+
         if (!Uri.TryCreate(serverAddress, UriKind.Absolute, out Uri? serverUri) ||
             !serverUri.Scheme.Equals("tcp", StringComparison.OrdinalIgnoreCase))
         {
@@ -49,6 +67,7 @@ public partial class LoginForm : Form
         Username = username;
         Password = password;
         ServerAddress = serverAddress;
+        RegisterRequested = register;
         DialogResult = DialogResult.OK;
         Close();
     }

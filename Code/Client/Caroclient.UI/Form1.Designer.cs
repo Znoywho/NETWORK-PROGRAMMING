@@ -199,13 +199,16 @@ partial class Form1
         gbRankDisplay.Size = new Size(140, 65);
         gbRankDisplay.TabIndex = 3;
         gbRankDisplay.TabStop = false;
+        gbRankDisplay.BackColor = Color.FromArgb(45, 24, 72);
+        gbRankDisplay.ForeColor = Color.White;
         gbRankDisplay.Text = "Điểm của bạn";
         // 
         // lblRankPointsDisplay
         // 
         lblRankPointsDisplay.Dock = DockStyle.None;
         lblRankPointsDisplay.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-        lblRankPointsDisplay.ForeColor = SystemColors.ControlText;
+        lblRankPointsDisplay.ForeColor = Color.Gold;
+        lblRankPointsDisplay.BackColor = Color.FromArgb(45, 24, 72);
         lblRankPointsDisplay.Location = new Point(3, 27);
         lblRankPointsDisplay.Name = "lblRankPointsDisplay";
         lblRankPointsDisplay.Size = new Size(134, 27);
@@ -334,6 +337,8 @@ partial class Form1
         // 
         lblTurnClock.Dock = DockStyle.Fill;
         lblTurnClock.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+        lblTurnClock.BackColor = Color.FromArgb(45, 24, 72);
+        lblTurnClock.ForeColor = Color.White;
         lblTurnClock.Location = new Point(3, 632);
         lblTurnClock.Name = "lblTurnClock";
         lblTurnClock.Size = new Size(548, 34);
@@ -402,6 +407,8 @@ partial class Form1
         gbInviteMessage.Controls.Add(btnAccept);
         gbInviteMessage.Controls.Add(btnReject);
         gbInviteMessage.Dock = DockStyle.Fill;
+        gbInviteMessage.BackColor = Color.FromArgb(45, 24, 72);
+        gbInviteMessage.ForeColor = Color.White;
         gbInviteMessage.Location = new Point(3, 332);
         gbInviteMessage.Name = "gbInviteMessage";
         gbInviteMessage.Size = new Size(310, 106);
@@ -413,6 +420,9 @@ partial class Form1
         // lblInviteMessage
         // 
         lblInviteMessage.Dock = DockStyle.Top;
+        lblInviteMessage.BackColor = Color.FromArgb(45, 24, 72);
+        lblInviteMessage.ForeColor = Color.Gold;
+        lblInviteMessage.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
         lblInviteMessage.Location = new Point(3, 23);
         lblInviteMessage.Name = "lblInviteMessage";
         lblInviteMessage.Size = new Size(304, 38);
@@ -423,6 +433,7 @@ partial class Form1
         btnAccept.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
         btnAccept.Location = new Point(12, 66);
         btnAccept.Name = "btnAccept";
+        btnAccept.ForeColor = Color.Black;
         btnAccept.Size = new Size(140, 30);
         btnAccept.TabIndex = 1;
         btnAccept.Text = "Chấp nhận";
@@ -433,6 +444,7 @@ partial class Form1
         btnReject.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
         btnReject.Location = new Point(158, 66);
         btnReject.Name = "btnReject";
+        btnReject.ForeColor = Color.Black;
         btnReject.Size = new Size(140, 30);
         btnReject.TabIndex = 2;
         btnReject.Text = "Từ chối";

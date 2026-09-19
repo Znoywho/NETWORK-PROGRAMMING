@@ -10,6 +10,7 @@ partial class LoginForm
     private TextBox txtServerAddress = null!;
     private Button btnLogin = null!;
     private Button btnCancel = null!;
+    private Button btnRegister = null!;
 
     protected override void Dispose(bool disposing)
     {
@@ -30,6 +31,7 @@ partial class LoginForm
         txtServerAddress = new TextBox();
         btnLogin = new Button();
         btnCancel = new Button();
+        btnRegister = new Button();
         lblPassWord = new Label();
         contextMenuStrip1 = new ContextMenuStrip(components);
         txtPassword = new TextBox();
@@ -82,7 +84,7 @@ partial class LoginForm
         // 
         // btnLogin
         // 
-        btnLogin.Location = new Point(586, 249);
+        btnLogin.Location = new Point(475, 249);
         btnLogin.Name = "btnLogin";
         btnLogin.Size = new Size(105, 32);
         btnLogin.TabIndex = 2;
@@ -99,6 +101,16 @@ partial class LoginForm
         btnCancel.TabIndex = 3;
         btnCancel.Text = "Thoát";
         btnCancel.UseVisualStyleBackColor = true;
+        //
+        // btnRegister
+        //
+        btnRegister.Location = new Point(586, 249);
+        btnRegister.Name = "btnRegister";
+        btnRegister.Size = new Size(105, 32);
+        btnRegister.TabIndex = 3;
+        btnRegister.Text = "Đăng ký";
+        btnRegister.UseVisualStyleBackColor = true;
+        btnRegister.Click += btnRegister_Click;
         // 
         // lblPassWord
         // 
@@ -133,6 +145,7 @@ partial class LoginForm
         CancelButton = btnCancel;
         ClientSize = new Size(839, 518);
         Controls.Add(txtPassword);
+        Controls.Add(btnRegister);
         Controls.Add(btnCancel);
         Controls.Add(btnLogin);
         Controls.Add(txtServerAddress);
