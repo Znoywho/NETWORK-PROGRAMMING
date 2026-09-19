@@ -35,10 +35,6 @@ partial class Form1
         thôngTinToolStripMenuItem = new ToolStripMenuItem();
         tàiKhoảnCủaTôiToolStripMenuItem = new ToolStripMenuItem();
         hồSơCủaTôiToolStripMenuItem = new ToolStripMenuItem();
-        tínhNăngToolStripMenuItem = new ToolStripMenuItem();
-        bạnBèToolStripMenuItem = new ToolStripMenuItem();
-        nhắnTinToolStripMenuItem = new ToolStripMenuItem();
-        lịchSửToolStripMenuItem = new ToolStripMenuItem();
         tlpRoot = new TableLayoutPanel();
         flpActions = new FlowLayoutPanel();
         btnInvitePlayer = new Button();
@@ -77,7 +73,7 @@ partial class Form1
         // menuStrip1
         // 
         menuStrip1.ImageScalingSize = new Size(20, 20);
-        menuStrip1.Items.AddRange(new ToolStripItem[] { menuToolStripMenuItem, thôngTinToolStripMenuItem, tínhNăngToolStripMenuItem });
+        menuStrip1.Items.AddRange(new ToolStripItem[] { menuToolStripMenuItem, thôngTinToolStripMenuItem });
         menuStrip1.Location = new Point(0, 0);
         menuStrip1.Name = "menuStrip1";
         menuStrip1.Size = new Size(1060, 28);
@@ -124,34 +120,6 @@ partial class Form1
         hồSơCủaTôiToolStripMenuItem.Size = new Size(203, 26);
         hồSơCủaTôiToolStripMenuItem.Text = "Hồ sơ của tôi";
         hồSơCủaTôiToolStripMenuItem.Click += hồSơCủaTôiToolStripMenuItem_Click;
-        // 
-        // tínhNăngToolStripMenuItem
-        // 
-        tínhNăngToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { bạnBèToolStripMenuItem, nhắnTinToolStripMenuItem, lịchSửToolStripMenuItem });
-        tínhNăngToolStripMenuItem.Name = "tínhNăngToolStripMenuItem";
-        tínhNăngToolStripMenuItem.Size = new Size(92, 24);
-        tínhNăngToolStripMenuItem.Text = "Tính năng";
-        // 
-        // bạnBèToolStripMenuItem
-        // 
-        bạnBèToolStripMenuItem.Name = "bạnBèToolStripMenuItem";
-        bạnBèToolStripMenuItem.Size = new Size(164, 26);
-        bạnBèToolStripMenuItem.Text = "Bạn bè";
-        bạnBèToolStripMenuItem.Click += bạnBèToolStripMenuItem_Click;
-        // 
-        // nhắnTinToolStripMenuItem
-        // 
-        nhắnTinToolStripMenuItem.Name = "nhắnTinToolStripMenuItem";
-        nhắnTinToolStripMenuItem.Size = new Size(164, 26);
-        nhắnTinToolStripMenuItem.Text = "Nhắn tin";
-        nhắnTinToolStripMenuItem.Click += nhắnTinToolStripMenuItem_Click;
-        // 
-        // lịchSửToolStripMenuItem
-        // 
-        lịchSửToolStripMenuItem.Name = "lịchSửToolStripMenuItem";
-        lịchSửToolStripMenuItem.Size = new Size(164, 26);
-        lịchSửToolStripMenuItem.Text = "Lịch sử";
-        lịchSửToolStripMenuItem.Click += lịchSửToolStripMenuItem_Click;
         // 
         // tlpRoot
         // 
@@ -493,10 +461,6 @@ partial class Form1
     private ToolStripMenuItem thôngTinToolStripMenuItem;
     private ToolStripMenuItem tàiKhoảnCủaTôiToolStripMenuItem;
     private ToolStripMenuItem hồSơCủaTôiToolStripMenuItem;
-    private ToolStripMenuItem tínhNăngToolStripMenuItem;
-    private ToolStripMenuItem bạnBèToolStripMenuItem;
-    private ToolStripMenuItem nhắnTinToolStripMenuItem;
-    private ToolStripMenuItem lịchSửToolStripMenuItem;
 
     private TableLayoutPanel tlpRoot;
 

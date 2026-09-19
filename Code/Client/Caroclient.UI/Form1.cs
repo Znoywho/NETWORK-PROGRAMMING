@@ -671,23 +671,8 @@ namespace Caroclient.UI
 
 
 
-        private void nhắnTinToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            using var chatForm = new ChatForm();
-            chatForm.ShowDialog(this);
-        }
 
-        private void bạnBèToolStripMenuItem_Click(object? sender, EventArgs e)
-        {
-            using var friendsForm = new FriendsForm();
-            friendsForm.ShowDialog(this);
-        }
 
-        private void lịchSửToolStripMenuItem_Click(object? sender, EventArgs e)
-        {
-            using var historyForm = new MatchHistoryForm();
-            historyForm.ShowDialog(this);
-        }
 
 
 
