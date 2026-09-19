@@ -222,7 +222,34 @@ class Caro:
                     return False
         return True
     
-    
+    def get_remaining_time(self) -> float:
+        """Số giây còn lại của lượt hiện tại (không âm)"""
+        elapsed = time.time() - self.turn_start_time
+        remaining = self.time_limit - elapsed
+        return max(0.0, remaining)
+ 
+    def is_time_up(self) -> bool:
+        """Kiểm tra lượt hiện tại đã hết giờ suy nghĩ chưa"""
+        return (time.time() - self.turn_start_time) > self.time_limit
+ 
+    def handle_timeout(self):
+        """
+        Tự động xử lý khi hết giờ: người đang tới lượt bị xử thua ngay lập tức.
+        Trả về message game_result nếu hết giờ, hoặc None nếu chưa hết giờ.
+        """
+        if not self.is_time_up():
+            return None
+ 
+        self.status = "finished"
+        loser = self.current_turn
+        winner = self.player_O if loser == self.player_X else self.player_X
+ 
+        return {
+            "type": "game_result",
+            "result": "win",
+            "winner": winner,
+            "reason": f"Người chơi {loser} hết thời gian suy nghĩ ({self.time_limit}s)",
+        }
 
 def _create_test_board(size=15, empty=True):
     if empty:
