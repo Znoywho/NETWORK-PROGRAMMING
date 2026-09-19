@@ -56,7 +56,7 @@ namespace Caroclient.UI
             ChessBoard.GameEnded += ChessBoard_GameEnded;
             ChessBoard.CellClicked += ChessBoard_CellClicked;
 
-            BuildOnlineUi();
+            WireUpControls();
             ConfigurePlayerInfo();
             ChessBoard.DrawChessBoard();
             ChessBoard.SetInteractive(false);
@@ -70,128 +70,23 @@ namespace Caroclient.UI
         #region Online UI
 
         /// <summary>
-        /// Khởi tạo các control phần chơi mạng. Chúng đã được khai báo trong
-        /// Form1.Designer.cs nhưng chưa được dựng, nên dựng ở đây để không phải
-        /// sửa file designer.
+        /// Toan bo layout nam trong Form1.Designer.cs. O day chi noi su kien
+        /// cho cac control do designer tao ra.
         /// </summary>
-        private void BuildOnlineUi()
+        private void WireUpControls()
         {
-            ClientSize = new Size(1190, 600);
-
-            lblTurnClock = new Label
-            {
-                AutoSize = false,
-                Location = new Point(OnlinePanelX, 70),
-                Size = new Size(320, 28),
-                Font = new Font(Font.FontFamily, 12, FontStyle.Bold),
-                Text = "",
-                Visible = false
-            };
-
-            var lblOnline = new Label
-            {
-                AutoSize = true,
-                Location = new Point(OnlinePanelX, 112),
-                Text = "Người chơi online"
-            };
-
-            lstOnlinePlayers = new ListBox
-            {
-                Location = new Point(OnlinePanelX, 135),
-                Size = new Size(320, 150)
-            };
+            btnInvitePlayer.Click += (_, _) => InviteSelectedPlayer();
             lstOnlinePlayers.DoubleClick += (_, _) => InviteSelectedPlayer();
 
-            btnRefreshPlayers = new Button
-            {
-                Location = new Point(OnlinePanelX, 292),
-                Size = new Size(100, 29),
-                Text = "Làm mới"
-            };
+            btnSpectateMatch.Click += (_, _) => ChooseMatchToSpectate();
+
+            btnLeaveRoom.Click += async (_, _) => await LeaveRoomAsync();
+
             btnRefreshPlayers.Click += async (_, _) => await SafeSendAsync(client.GetOnlinePlayersAsync());
 
-            var btnInvitePlayer = new Button
-            {
-                Location = new Point(OnlinePanelX + 108, 292),
-                Size = new Size(100, 29),
-                Text = "Mời đấu"
-            };
-            btnInvitePlayer.Click += (_, _) => InviteSelectedPlayer();
-
-            btnSpectate2 = new Button
-            {
-                Location = new Point(OnlinePanelX + 216, 292),
-                Size = new Size(104, 29),
-                Text = "Xem trận"
-            };
-            btnSpectate2.Click += (_, _) => ChooseMatchToSpectate();
-
-            gbInviteMessage = new GroupBox
-            {
-                Location = new Point(OnlinePanelX, 331),
-                Size = new Size(320, 100),
-                Text = "Lời mời",
-                Visible = false
-            };
-
-            lblInviteMessage = new Label
-            {
-                AutoSize = false,
-                Location = new Point(12, 25),
-                Size = new Size(296, 30),
-                Text = ""
-            };
-
-            btnAccept = new Button
-            {
-                Location = new Point(12, 60),
-                Size = new Size(140, 29),
-                Text = "Chấp nhận"
-            };
             btnAccept.Click += async (_, _) => await RespondToInviteAsync(accept: true);
-
-            btnReject = new Button
-            {
-                Location = new Point(168, 60),
-                Size = new Size(140, 29),
-                Text = "Từ chối"
-            };
             btnReject.Click += async (_, _) => await RespondToInviteAsync(accept: false);
-
-            gbInviteMessage.Controls.AddRange(new Control[] { lblInviteMessage, btnAccept, btnReject });
-
-            btnSurrender = new Button
-            {
-                Location = new Point(OnlinePanelX, 441),
-                Size = new Size(320, 29),
-                Text = "Rời phòng / Đầu hàng",
-                Enabled = false
-            };
-            btnSurrender.Click += async (_, _) => await LeaveRoomAsync();
-
-            rtbLog = new RichTextBox
-            {
-                Location = new Point(OnlinePanelX, 480),
-                Size = new Size(320, 100),
-                ReadOnly = true
-            };
-
-            Controls.AddRange(new Control[]
-            {
-                lblTurnClock, lblOnline, lstOnlinePlayers, btnRefreshPlayers, btnInvitePlayer,
-                btnSpectate2, gbInviteMessage, btnSurrender, rtbLog
-            });
-
-            // Nút này trong designer đang là "Chơi với máy"; ở chế độ online nó
-            // dùng để rời phòng nên đổi nhãn cho khớp.
-            btnLeave.Text = "Rời phòng";
-            btnLeave.Click += async (_, _) => await LeaveRoomAsync();
         }
-
-        private const int OnlinePanelX = 840;
-        private Button btnRefreshPlayers = null!;
-        private Button btnSpectate2 = null!;
-        private Label lblTurnClock = null!;
 
         #endregion
 
@@ -288,7 +183,7 @@ namespace Caroclient.UI
             {
                 roomId = null;
                 isSpectator = false;
-                btnSurrender.Enabled = false;
+                btnLeaveRoom.Enabled = false;
                 ChessBoard.SetInteractive(false);
                 Log($"Đã rời phòng (vai trò {result.Role}).");
             });
@@ -319,7 +214,7 @@ namespace Caroclient.UI
                 {
                     Log($"Mất kết nối: {reason}. Đang thử kết nối lại...");
                     ChessBoard.SetInteractive(false);
-                    btnSurrender.Enabled = false;
+                    btnLeaveRoom.Enabled = false;
                 });
 
                 _ = TryReconnectAsync();
@@ -345,7 +240,7 @@ namespace Caroclient.UI
                 && state.Status == "playing";
 
             ChessBoard.SetInteractive(myTurn);
-            btnSurrender.Enabled = !isSpectator && state.Status == "playing";
+            btnLeaveRoom.Enabled = !isSpectator && state.Status == "playing";
             gbInviteMessage.Visible = false;
 
             txtPlayerName2.Text = isSpectator ? "Đang xem" : "O - Đối thủ";
@@ -411,7 +306,7 @@ namespace Caroclient.UI
         private void ApplyGameResult(GameResultMessage result)
         {
             ChessBoard.SetInteractive(false);
-            btnSurrender.Enabled = false;
+            btnLeaveRoom.Enabled = false;
             roomId = null;
             StopTurnClock();
 
@@ -736,18 +631,15 @@ namespace Caroclient.UI
             Application.Exit();
         }
 
-        private void ChessNode_Click(object sender, EventArgs e)
-        {
 
-        }
-
-        private void pnlChessBoard_Paint(object sender, PaintEventArgs e)
-        {
-
-        }
 
         private async void Form1_Load(object sender, EventArgs e)
         {
+            // Chot kich thuoc khoi dong lam min: keo nho hon nua thi bang co
+            // (neo ca trai lan phai) bi co ve 0 va bien mat. Lay Size o Load
+            // de da tinh ca DPI scaling, khoi phai hardcode con so.
+            MinimumSize = Size;
+
             await ConnectAndLoginAsync();
         }
 
@@ -775,53 +667,14 @@ namespace Caroclient.UI
             await SafeSendAsync(client.LoginAsync(Username, Password));
         }
 
-        private void button2_Click(object sender, EventArgs e)
-        {
-            InviteSelectedPlayer();
-        }
 
-        private void groupBox1_Enter(object sender, EventArgs e)
-        {
 
-        }
 
-        private void label1_Click(object sender, EventArgs e)
-        {
 
-        }
 
-        private void txtChatInput_TextChanged(object sender, EventArgs e)
-        {
 
-        }
 
-        private void button1_Click(object sender, EventArgs e)
-        {
-            using var chatForm = new ChatForm();
-            chatForm.ShowDialog(this);
-        }
 
-        private void btnInvite_Click(object? sender, EventArgs e)
-        {
-            using var friendsForm = new FriendsForm();
-            friendsForm.ShowDialog(this);
-        }
-
-        private void btnSpectate_Click(object? sender, EventArgs e)
-        {
-            using var historyForm = new MatchHistoryForm();
-            historyForm.ShowDialog(this);
-        }
-
-        private void txtUsername_TextChanged(object sender, EventArgs e)
-        {
-
-        }
-
-        private void pictureBox1_Click(object sender, EventArgs e)
-        {
-
-        }
 
         private void newGameToolStripMenuItem_Click(object sender, EventArgs e)
         {
@@ -853,10 +706,6 @@ namespace Caroclient.UI
             }
         }
 
-        private void thôngTinToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-
-        }
 
         private void tàiKhoảnCủaTôiToolStripMenuItem_Click(object? sender, EventArgs e)
         {
@@ -870,9 +719,5 @@ namespace Caroclient.UI
             profileForm.ShowDialog(this);
         }
 
-        private void pictureBox1_Click_1(object sender, EventArgs e)
-        {
-
-        }
     }
 }
