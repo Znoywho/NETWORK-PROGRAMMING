@@ -26,6 +26,9 @@ namespace Caroclient.UI
         private bool dangChonTranDeXem; // đã xin match_list để mở bảng chọn phòng
         private bool dangChoXacNhanNuocDi;
 
+        /// <summary>Quân mà mình đang chơi: 0 = X, 1 = O. -1 = chưa vào trận.</summary>
+        private int mySymbol = -1;
+
         // Đồng hồ hiển thị: server gửi số giây còn lại trong game_state, client
         // chỉ đếm ngược tại chỗ nên không cần server bắn message mỗi giây.
         private readonly System.Windows.Forms.Timer turnClockTimer = new() { Interval = 1000 };
@@ -243,7 +246,26 @@ namespace Caroclient.UI
             btnLeaveRoom.Enabled = !isSpectator && state.Status == "playing";
             gbInviteMessage.Visible = false;
 
-            txtPlayerName2.Text = isSpectator ? "Đang xem" : "O - Đối thủ";
+            // --- Cập nhật icon X/O và tên dựa theo quân được server giao ---
+            if (!isSpectator && !string.IsNullOrEmpty(myPlayerId))
+            {
+                bool iAmX = state.PlayerXId == myPlayerId;
+                mySymbol = iAmX ? 0 : 1;
+
+                // Đổi icon giữa bảng tỉ số sang đúng quân của mình
+                ChessBoard.ShowMark(mySymbol);
+
+                txbPlayerName1.Text = iAmX
+                    ? $"X - {Username}"
+                    : $"O - {Username}";
+                txtPlayerName2.Text = iAmX
+                    ? "O - Đối thủ"
+                    : "X - Đối thủ";
+            }
+            else
+            {
+                txtPlayerName2.Text = isSpectator ? "Đang xem" : "O - Đối thủ";
+            }
 
             // Khán giả vào giữa trận cũng nhận đúng đồng hồ này trong game_state.
             waitingForPlayerId = state.WaitingForPlayerId;

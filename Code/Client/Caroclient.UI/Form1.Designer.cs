@@ -1,4 +1,4 @@
-﻿namespace Caroclient.UI;
+namespace Caroclient.UI;
 
 partial class Form1
 {
@@ -37,6 +37,10 @@ partial class Form1
         hồSơCủaTôiToolStripMenuItem = new ToolStripMenuItem();
         tlpRoot = new TableLayoutPanel();
         flpActions = new FlowLayoutPanel();
+        gbRankDisplay = new GroupBox();
+        lblRankEmoji = new Label();
+        lblRankName = new Label();
+        lblRankPointsDisplay = new Label();
         btnInvitePlayer = new Button();
         btnSpectateMatch = new Button();
         btnLeaveRoom = new Button();
@@ -62,6 +66,7 @@ partial class Form1
         menuStrip1.SuspendLayout();
         tlpRoot.SuspendLayout();
         flpActions.SuspendLayout();
+        gbRankDisplay.SuspendLayout();
         tlpCenter.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)ptbTitle).BeginInit();
         tlpScore.SuspendLayout();
@@ -147,6 +152,7 @@ partial class Form1
         flpActions.Controls.Add(btnInvitePlayer);
         flpActions.Controls.Add(btnSpectateMatch);
         flpActions.Controls.Add(btnLeaveRoom);
+        flpActions.Controls.Add(gbRankDisplay);
         flpActions.Dock = DockStyle.Fill;
         flpActions.FlowDirection = FlowDirection.TopDown;
         flpActions.Location = new Point(3, 3);
@@ -185,6 +191,54 @@ partial class Form1
         btnLeaveRoom.TabIndex = 2;
         btnLeaveRoom.Text = "Rời phòng";
         btnLeaveRoom.UseVisualStyleBackColor = true;
+        // 
+        // gbRankDisplay
+        // 
+        gbRankDisplay.Controls.Add(lblRankEmoji);
+        gbRankDisplay.Controls.Add(lblRankName);
+        gbRankDisplay.Controls.Add(lblRankPointsDisplay);
+        gbRankDisplay.Location = new Point(11, 186);
+        gbRankDisplay.Margin = new Padding(3, 10, 3, 3);
+        gbRankDisplay.Name = "gbRankDisplay";
+        gbRankDisplay.Size = new Size(140, 120);
+        gbRankDisplay.TabIndex = 3;
+        gbRankDisplay.TabStop = false;
+        gbRankDisplay.Text = "Xếp hạng";
+        // 
+        // lblRankEmoji
+        // 
+        lblRankEmoji.Dock = DockStyle.Top;
+        lblRankEmoji.Font = new Font("Segoe UI Emoji", 28F);
+        lblRankEmoji.Location = new Point(3, 23);
+        lblRankEmoji.Name = "lblRankEmoji";
+        lblRankEmoji.Size = new Size(134, 52);
+        lblRankEmoji.TabIndex = 0;
+        lblRankEmoji.Text = "🥉";
+        lblRankEmoji.TextAlign = ContentAlignment.MiddleCenter;
+        // 
+        // lblRankName
+        // 
+        lblRankName.Dock = DockStyle.None;
+        lblRankName.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+        lblRankName.ForeColor = Color.FromArgb(205, 127, 50);
+        lblRankName.Location = new Point(3, 75);
+        lblRankName.Name = "lblRankName";
+        lblRankName.Size = new Size(134, 20);
+        lblRankName.TabIndex = 1;
+        lblRankName.Text = "Chưa xếp hạng";
+        lblRankName.TextAlign = ContentAlignment.MiddleCenter;
+        // 
+        // lblRankPointsDisplay
+        // 
+        lblRankPointsDisplay.Dock = DockStyle.None;
+        lblRankPointsDisplay.Font = new Font("Segoe UI", 8F);
+        lblRankPointsDisplay.ForeColor = Color.Gray;
+        lblRankPointsDisplay.Location = new Point(3, 95);
+        lblRankPointsDisplay.Name = "lblRankPointsDisplay";
+        lblRankPointsDisplay.Size = new Size(134, 18);
+        lblRankPointsDisplay.TabIndex = 2;
+        lblRankPointsDisplay.Text = "0 RP";
+        lblRankPointsDisplay.TextAlign = ContentAlignment.MiddleCenter;
         // 
         // tlpCenter
         // 
@@ -441,6 +495,7 @@ partial class Form1
         menuStrip1.PerformLayout();
         tlpRoot.ResumeLayout(false);
         flpActions.ResumeLayout(false);
+        gbRankDisplay.ResumeLayout(false);
         tlpCenter.ResumeLayout(false);
         ((System.ComponentModel.ISupportInitialize)ptbTitle).EndInit();
         tlpScore.ResumeLayout(false);
@@ -465,6 +520,10 @@ partial class Form1
     private TableLayoutPanel tlpRoot;
 
     private FlowLayoutPanel flpActions;
+    private GroupBox gbRankDisplay;
+    private Label lblRankEmoji;
+    private Label lblRankName;
+    private Label lblRankPointsDisplay;
     private Button btnInvitePlayer;
     private Button btnSpectateMatch;
     private Button btnLeaveRoom;

@@ -275,6 +275,12 @@ public class GameStateMessage
     [JsonPropertyName("currentPlayerId")]
     public string CurrentPlayerId { get; set; } = string.Empty;
 
+    [JsonPropertyName("playerXId")]
+    public string PlayerXId { get; set; } = string.Empty;
+
+    [JsonPropertyName("playerOId")]
+    public string PlayerOId { get; set; } = string.Empty;
+
     [JsonPropertyName("status")]
     public string Status { get; set; } = string.Empty;
 
