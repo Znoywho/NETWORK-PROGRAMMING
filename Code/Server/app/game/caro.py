@@ -1,5 +1,7 @@
 import random
 
+from Lib import json
+
 
 class Caro:
     def __init__(self, rows: int, cols: int, winning_condition: int = 5, XO: str = "X"):
@@ -211,6 +213,25 @@ class Caro:
                     return False
         return True
 
+    def export_state(self) -> dict:
+        """
+        Đóng gói trạng thái hiện tại của bàn cờ thành dict, dùng để gửi qua message
+        dạng "game_state" cho client/server.
+        """
+        return {
+            "type": "game_state",
+            "rows": self.rows,
+            "cols": self.cols,
+            "grid": self.grid,
+            "current_turn": self.current_turn,
+            "status": self.status,
+            "winning_condition": self.winning_condition,
+            "last_move": self.last_move[-1] if self.last_move else None,
+        }
+ 
+    def export_state_json(self) -> str:
+        """Giống export_state() nhưng trả về chuỗi JSON, sẵn sàng gửi qua socket"""
+        return json.dumps(self.export_state())
 
 def _create_test_board(size=15, empty=True):
     if empty:
