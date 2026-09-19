@@ -10,9 +10,7 @@ partial class ProfileForm
     private Label lblUsernameValue = null!;
     private Label lblPlayerIdValue = null!;
     private GroupBox grpRank = null!;
-    private Label lblRank = null!;
     private Label lblRankPoints = null!;
-    private Label lblRankValue = null!;
     private Label lblRankPointsValue = null!;
     private Button btnClose = null!;
 
@@ -35,9 +33,7 @@ partial class ProfileForm
         lblUsername = new Label();
         grpRank = new GroupBox();
         lblRankPointsValue = new Label();
-        lblRankValue = new Label();
         lblRankPoints = new Label();
-        lblRank = new Label();
         btnClose = new Button();
         grpAccount.SuspendLayout();
         grpRank.SuspendLayout();
@@ -106,51 +102,30 @@ partial class ProfileForm
         // grpRank
         // 
         grpRank.Controls.Add(lblRankPointsValue);
-        grpRank.Controls.Add(lblRankValue);
         grpRank.Controls.Add(lblRankPoints);
-        grpRank.Controls.Add(lblRank);
         grpRank.Location = new Point(30, 207);
         grpRank.Name = "grpRank";
         grpRank.Size = new Size(340, 108);
         grpRank.TabIndex = 2;
         grpRank.TabStop = false;
-        grpRank.Text = "Xếp hạng thi đấu";
-        // 
-        // lblRank
-        // 
-        lblRank.AutoSize = true;
-        lblRank.Location = new Point(18, 32);
-        lblRank.Name = "lblRank";
-        lblRank.Size = new Size(80, 20);
-        lblRank.TabIndex = 0;
-        lblRank.Text = "Xếp hạng:";
-        // 
-        // lblRankValue
-        // 
-        lblRankValue.AutoSize = true;
-        lblRankValue.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-        lblRankValue.Location = new Point(128, 32);
-        lblRankValue.Name = "lblRankValue";
-        lblRankValue.Size = new Size(115, 20);
-        lblRankValue.TabIndex = 1;
-        lblRankValue.Text = "Chưa xếp hạng";
+        grpRank.Text = "Điểm người chơi";
         // 
         // lblRankPoints
         // 
         lblRankPoints.AutoSize = true;
-        lblRankPoints.Location = new Point(18, 68);
+        lblRankPoints.Location = new Point(18, 42);
         lblRankPoints.Name = "lblRankPoints";
         lblRankPoints.Size = new Size(85, 20);
-        lblRankPoints.TabIndex = 2;
-        lblRankPoints.Text = "Điểm rank:";
+        lblRankPoints.TabIndex = 0;
+        lblRankPoints.Text = "Điểm:";
         // 
         // lblRankPointsValue
         // 
         lblRankPointsValue.AutoSize = true;
-        lblRankPointsValue.Location = new Point(128, 68);
+        lblRankPointsValue.Location = new Point(128, 42);
         lblRankPointsValue.Name = "lblRankPointsValue";
         lblRankPointsValue.Size = new Size(17, 20);
-        lblRankPointsValue.TabIndex = 3;
+        lblRankPointsValue.TabIndex = 1;
         lblRankPointsValue.Text = "0";
         // 
         // btnClose

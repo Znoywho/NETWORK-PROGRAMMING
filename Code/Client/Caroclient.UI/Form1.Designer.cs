@@ -38,8 +38,6 @@ partial class Form1
         tlpRoot = new TableLayoutPanel();
         flpActions = new FlowLayoutPanel();
         gbRankDisplay = new GroupBox();
-        lblRankEmoji = new Label();
-        lblRankName = new Label();
         lblRankPointsDisplay = new Label();
         btnInvitePlayer = new Button();
         btnSpectateMatch = new Button();
@@ -194,50 +192,25 @@ partial class Form1
         // 
         // gbRankDisplay
         // 
-        gbRankDisplay.Controls.Add(lblRankEmoji);
-        gbRankDisplay.Controls.Add(lblRankName);
         gbRankDisplay.Controls.Add(lblRankPointsDisplay);
         gbRankDisplay.Location = new Point(11, 186);
         gbRankDisplay.Margin = new Padding(3, 10, 3, 3);
         gbRankDisplay.Name = "gbRankDisplay";
-        gbRankDisplay.Size = new Size(140, 120);
+        gbRankDisplay.Size = new Size(140, 65);
         gbRankDisplay.TabIndex = 3;
         gbRankDisplay.TabStop = false;
-        gbRankDisplay.Text = "Xếp hạng";
-        // 
-        // lblRankEmoji
-        // 
-        lblRankEmoji.Dock = DockStyle.Top;
-        lblRankEmoji.Font = new Font("Segoe UI Emoji", 28F);
-        lblRankEmoji.Location = new Point(3, 23);
-        lblRankEmoji.Name = "lblRankEmoji";
-        lblRankEmoji.Size = new Size(134, 52);
-        lblRankEmoji.TabIndex = 0;
-        lblRankEmoji.Text = "🥉";
-        lblRankEmoji.TextAlign = ContentAlignment.MiddleCenter;
-        // 
-        // lblRankName
-        // 
-        lblRankName.Dock = DockStyle.None;
-        lblRankName.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-        lblRankName.ForeColor = Color.FromArgb(205, 127, 50);
-        lblRankName.Location = new Point(3, 75);
-        lblRankName.Name = "lblRankName";
-        lblRankName.Size = new Size(134, 20);
-        lblRankName.TabIndex = 1;
-        lblRankName.Text = "Chưa xếp hạng";
-        lblRankName.TextAlign = ContentAlignment.MiddleCenter;
+        gbRankDisplay.Text = "Điểm của bạn";
         // 
         // lblRankPointsDisplay
         // 
         lblRankPointsDisplay.Dock = DockStyle.None;
-        lblRankPointsDisplay.Font = new Font("Segoe UI", 8F);
-        lblRankPointsDisplay.ForeColor = Color.Gray;
-        lblRankPointsDisplay.Location = new Point(3, 95);
+        lblRankPointsDisplay.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+        lblRankPointsDisplay.ForeColor = SystemColors.ControlText;
+        lblRankPointsDisplay.Location = new Point(3, 27);
         lblRankPointsDisplay.Name = "lblRankPointsDisplay";
-        lblRankPointsDisplay.Size = new Size(134, 18);
-        lblRankPointsDisplay.TabIndex = 2;
-        lblRankPointsDisplay.Text = "0 RP";
+        lblRankPointsDisplay.Size = new Size(134, 27);
+        lblRankPointsDisplay.TabIndex = 0;
+        lblRankPointsDisplay.Text = "Đang tải...";
         lblRankPointsDisplay.TextAlign = ContentAlignment.MiddleCenter;
         // 
         // tlpCenter
@@ -521,8 +494,6 @@ partial class Form1
 
     private FlowLayoutPanel flpActions;
     private GroupBox gbRankDisplay;
-    private Label lblRankEmoji;
-    private Label lblRankName;
     private Label lblRankPointsDisplay;
     private Button btnInvitePlayer;
     private Button btnSpectateMatch;

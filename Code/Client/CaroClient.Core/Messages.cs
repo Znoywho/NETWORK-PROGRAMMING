@@ -124,6 +124,10 @@ public class AuthResultMessage
 
     [JsonPropertyName("playerId")]
     public string PlayerId { get; set; } = string.Empty;
+
+    /// <summary>Điểm hiện tại do server lưu.</summary>
+    [JsonPropertyName("ranking")]
+    public int Ranking { get; set; }
 }
 
 public class OnlinePlayersMessage
@@ -317,6 +321,13 @@ public class GameResultMessage
     /// <summary>timeout | disconnect | forfeit. Null nghĩa là thắng thua bình thường trên bàn cờ.</summary>
     [JsonPropertyName("reason")]
     public string? Reason { get; set; }
+
+    /// <summary>
+    /// Điểm mới sau một ván kết thúc bình thường. Không có khi ván kết thúc do
+    /// timeout, mất kết nối hoặc bỏ trận vì các trường hợp đó không tính điểm.
+    /// </summary>
+    [JsonPropertyName("ranking")]
+    public int? Ranking { get; set; }
 }
 
 public class LeaveRoomResultMessage

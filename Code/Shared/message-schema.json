@@ -75,9 +75,10 @@
       "properties": {
         "type": { "const": "login" },
         "username": { "type": "string", "minLength": 1 },
-        "playerId": { "$ref": "#/$defs/playerId" }
+        "playerId": { "$ref": "#/$defs/playerId" },
+        "ranking": { "description": "Diem hien tai cua nguoi choi.", "type": "integer" }
       },
-      "required": ["type", "username", "playerId"],
+      "required": ["type", "username", "playerId", "ranking"],
       "additionalProperties": false
     },
 
@@ -98,9 +99,10 @@
       "properties": {
         "type": { "const": "create_user" },
         "username": { "type": "string", "minLength": 1 },
-        "playerId": { "$ref": "#/$defs/playerId" }
+        "playerId": { "$ref": "#/$defs/playerId" },
+        "ranking": { "description": "Tai khoan moi bat dau voi 0 diem.", "type": "integer" }
       },
-      "required": ["type", "username", "playerId"],
+      "required": ["type", "username", "playerId", "ranking"],
       "additionalProperties": false
     },
 
@@ -388,6 +390,10 @@
           "description": "Vi sao van ket thuc. Khong co truong nay nghia la thang thua binh thuong tren ban co.",
           "type": "string",
           "enum": ["timeout", "disconnect", "forfeit"]
+        },
+        "ranking": {
+          "description": "Diem moi cua nguoi nhan, chi co sau van ket thuc binh thuong tren ban co.",
+          "type": "integer"
         }
       },
       "required": ["type", "room_id", "result"],

@@ -261,7 +261,8 @@ class MessageHandler:
             self._reply({
                 "type": "login", 
                 "username": user.username, 
-                "playerId": player_id
+                "playerId": player_id,
+                "ranking": int(user.ranking or 0),
                 }),
             *self._resume_after_reconnect(player_id),
             self._broadcast_online_players(),
@@ -337,7 +338,8 @@ class MessageHandler:
             self._reply({
                 "type": "create_user",
                 "username": user.username,
-                "playerId": str(user.id)
+                "playerId": str(user.id),
+                "ranking": int(user.ranking or 0),
                 }),
             ]
 
@@ -494,20 +496,23 @@ class MessageHandler:
 
         # score_player doi phong da o trang thai FINISHED moi chiu tinh diem.
         room.status = RoomStatus.FINISHED
-        self.score_player(room, winner)
+        rankings = self.score_player(room, winner)
         winner_id = room.player_x if winner == 0 else room.player_o if winner == 1 else None
-        return self._end_game_deliveries(room, winner_id, drawn=winner == 2)
+        return self._end_game_deliveries(
+            room, winner_id, drawn=winner == 2, rankings=rankings
+        )
 
 
-    def score_player(self, room: Room, winner: int):
+    def score_player(self, room: Room, winner: int) -> dict[str, int]:
         if room.status != RoomStatus.FINISHED:
-            return [self._error("ROOM_NOT_FINISHED", "Game room was not finished.")]
+            return {}
 
         player_x_user = self.session.query(User).filter(User.id == as_db_id(room.player_x)).first()
         player_o_user = self.session.query(User).filter(User.id == as_db_id(room.player_o)).first()
 
         if player_x_user is None or player_o_user is None:
-            return [self._error(code="USER_NOT_FOUND", message="Player user not found.")]
+            logger.error("Khong tim thay user de tinh rank cho phong %s.", room.room_id)
+            return {}
 
         E_X = 1 / (1 + 10 ** ((player_o_user.ranking - player_x_user.ranking) / 400))
         E_O = 1 / (1 + 10 ** ((player_x_user.ranking - player_o_user.ranking) / 400))
@@ -527,6 +532,12 @@ class MessageHandler:
         except Exception as e:
             self.session.rollback()
             logger.error(f"Scoring failed for room {room.room_id}: {e}")
+            return {}
+
+        return {
+            room.player_x: int(player_x_user.ranking),
+            room.player_o: int(player_o_user.ranking),
+        }
 
     # ------------------------------------------------------------
     #  Ghi lich su van dau (matches / moves)
@@ -739,6 +750,7 @@ class MessageHandler:
         *,
         drawn: bool = False,
         reason: str | None = None,
+        rankings: dict[str, int] | None = None,
     ) -> list[dict[str, Any]]:
         """Dong mot van: tat dong ho, ghi ket qua, tra moi nguoi ve idle.
 
@@ -763,7 +775,11 @@ class MessageHandler:
         return [
             self._targeted(recipients, self._game_state(room, winner_id)),
             *self._game_result_deliveries(
-                room.room_id, winner_id, [room.player_x, room.player_o], reason=reason
+                room.room_id,
+                winner_id,
+                [room.player_x, room.player_o],
+                reason=reason,
+                rankings=rankings,
             ),
             self._broadcast_online_players(),
         ]
@@ -800,6 +816,7 @@ class MessageHandler:
         recipients: list[str],
         *,
         reason: str | None = None,
+        rankings: dict[str, int] | None = None,
     ) -> list[dict[str, Any]]:
         deliveries = []
         for recipient_id in recipients:
@@ -815,6 +832,8 @@ class MessageHandler:
             # timeout | disconnect | forfeit — de client noi ro vi sao van ket thuc.
             if reason is not None:
                 payload["reason"] = reason
+            if rankings is not None and recipient_id in rankings:
+                payload["ranking"] = rankings[recipient_id]
             deliveries.append(self._targeted([recipient_id], payload))
         return deliveries
 

@@ -388,7 +388,18 @@ namespace Caroclient.UI
         /// <summary>Đổi ký hiệu hiển thị bên cạnh tên người chơi.</summary>
         public void ShowMark(int playerIndex)
         {
+            if (playerIndex < 0 || playerIndex >= Player.Count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(playerIndex));
+            }
+
             PlayerMark.Image = Player[playerIndex].Mark;
+        }
+
+        /// <summary>Xoá ký hiệu khi người dùng chưa được server gán quân.</summary>
+        public void ClearMark()
+        {
+            PlayerMark.Image = null;
         }
         #endregion
 
