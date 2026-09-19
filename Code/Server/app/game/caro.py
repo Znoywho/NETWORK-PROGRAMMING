@@ -1,4 +1,5 @@
 import random
+import time
 
 
 class Caro:
@@ -26,6 +27,10 @@ class Caro:
         self.current_turn = self.player_X if XO == "X" else self.player_O
         self.status = "playing"
 
+        """thoi gian toi da cho 1 luot di chuyen"""
+        self.time_limit = 30   
+        self.turn_start_time = time.time()
+
     def _get_possible_moves(self):
         possible_moves = []
         for x in range(self.rows):
@@ -42,6 +47,9 @@ class Caro:
         self.XO = self.originXO
         self.current_turn = self.player_X if self.originXO == "X" else self.player_O
         self.status = "playing"
+
+        """reset lai thoi gian khi choi van moi"""
+        self.turn_start_time = time.time()
 
     def _visualize_grid(self):
         for i in range(self.rows):
@@ -102,6 +110,9 @@ class Caro:
             self.turn = 1
 
         self.current_turn = self.player_X if self.XO == "X" else self.player_O
+
+        """reset lai thoi gian khi co luot di chuyen moi"""
+        self.turn_start_time = time.time()
 
     def _get_all_rows(self):
         return self.grid
@@ -210,7 +221,35 @@ class Caro:
                 if self.grid[x][y] == ".":
                     return False
         return True
-
+    
+    def get_remaining_time(self) -> float:
+        """Số giây còn lại của lượt hiện tại (không âm)"""
+        elapsed = time.time() - self.turn_start_time
+        remaining = self.time_limit - elapsed
+        return max(0.0, remaining)
+ 
+    def is_time_up(self) -> bool:
+        """Kiểm tra lượt hiện tại đã hết giờ suy nghĩ chưa"""
+        return (time.time() - self.turn_start_time) > self.time_limit
+ 
+    def handle_timeout(self):
+        """
+        Tự động xử lý khi hết giờ: người đang tới lượt bị xử thua ngay lập tức.
+        Trả về message game_result nếu hết giờ, hoặc None nếu chưa hết giờ.
+        """
+        if not self.is_time_up():
+            return None
+ 
+        self.status = "finished"
+        loser = self.current_turn
+        winner = self.player_O if loser == self.player_X else self.player_X
+ 
+        return {
+            "type": "game_result",
+            "result": "win",
+            "winner": winner,
+            "reason": f"Người chơi {loser} hết thời gian suy nghĩ ({self.time_limit}s)",
+        }
 
 def _create_test_board(size=15, empty=True):
     if empty:
