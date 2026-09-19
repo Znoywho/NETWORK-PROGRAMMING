@@ -355,7 +355,7 @@ async Task HandleCommandAsync(string command)
     {
         if (parts.Length < 3)
         {
-            Console.WriteLine("Cú pháp: /register <username> <password>  (mật khẩu tối thiểu 10 ký tự)");
+            Console.WriteLine("Cú pháp: /register <username> <password>  (mật khẩu tối thiểu 6 ký tự)");
             return;
         }
 
@@ -503,7 +503,7 @@ static void PrintHelp()
     Console.WriteLine("  /spectate <room_id>          Xem một trận đang diễn ra");
     Console.WriteLine("  /leave [room_id]             Rời phòng hiện tại");
     Console.WriteLine("  /login <user> <pass>         Đăng nhập lại");
-    Console.WriteLine("  /register <user> <pass>      Tạo tài khoản mới (pass >= 10 ký tự)");
+    Console.WriteLine("  /register <user> <pass>      Tạo tài khoản mới (pass >= 6 ký tự)");
     Console.WriteLine("  /board                       In lại bàn cờ");
     Console.WriteLine("  /help                        Xem trợ giúp");
     Console.WriteLine("  /quit                        Thoát");

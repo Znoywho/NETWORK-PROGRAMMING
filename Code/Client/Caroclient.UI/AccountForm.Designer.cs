@@ -8,10 +8,7 @@ partial class AccountForm
     private Label lblPlayerId = null!;
     private TextBox txtUsername = null!;
     private TextBox txtPlayerId = null!;
-    private Button btnUpdate = null!;
-    private Button btnDelete = null!;
     private Button btnClose = null!;
-    private GroupBox grpDangerZone = null!;
 
     protected override void Dispose(bool disposing)
     {
@@ -29,11 +26,7 @@ partial class AccountForm
         lblPlayerId = new Label();
         txtUsername = new TextBox();
         txtPlayerId = new TextBox();
-        btnUpdate = new Button();
-        btnDelete = new Button();
         btnClose = new Button();
-        grpDangerZone = new GroupBox();
-        grpDangerZone.SuspendLayout();
         SuspendLayout();
         // 
         // lblTitle
@@ -69,6 +62,7 @@ partial class AccountForm
         txtUsername.Location = new Point(155, 82);
         txtUsername.MaxLength = 30;
         txtUsername.Name = "txtUsername";
+        txtUsername.ReadOnly = true;
         txtUsername.Size = new Size(215, 27);
         txtUsername.TabIndex = 0;
         // 
@@ -80,57 +74,24 @@ partial class AccountForm
         txtPlayerId.Size = new Size(215, 27);
         txtPlayerId.TabIndex = 1;
         // 
-        // btnUpdate
-        // 
-        btnUpdate.Location = new Point(155, 177);
-        btnUpdate.Name = "btnUpdate";
-        btnUpdate.Size = new Size(215, 32);
-        btnUpdate.TabIndex = 2;
-        btnUpdate.Text = "Cập nhật tài khoản";
-        btnUpdate.UseVisualStyleBackColor = true;
-        btnUpdate.Click += btnUpdate_Click;
-        // 
-        // grpDangerZone
-        // 
-        grpDangerZone.Controls.Add(btnDelete);
-        grpDangerZone.Location = new Point(30, 229);
-        grpDangerZone.Name = "grpDangerZone";
-        grpDangerZone.Size = new Size(340, 86);
-        grpDangerZone.TabIndex = 3;
-        grpDangerZone.TabStop = false;
-        grpDangerZone.Text = "Vùng nguy hiểm";
-        // 
-        // btnDelete
-        // 
-        btnDelete.ForeColor = Color.Firebrick;
-        btnDelete.Location = new Point(18, 31);
-        btnDelete.Name = "btnDelete";
-        btnDelete.Size = new Size(304, 32);
-        btnDelete.TabIndex = 0;
-        btnDelete.Text = "Xóa tài khoản";
-        btnDelete.UseVisualStyleBackColor = true;
-        btnDelete.Click += btnDelete_Click;
-        // 
         // btnClose
         // 
         btnClose.DialogResult = DialogResult.Cancel;
-        btnClose.Location = new Point(265, 333);
+        btnClose.Location = new Point(265, 177);
         btnClose.Name = "btnClose";
         btnClose.Size = new Size(105, 32);
-        btnClose.TabIndex = 4;
+        btnClose.TabIndex = 2;
         btnClose.Text = "Đóng";
         btnClose.UseVisualStyleBackColor = true;
         // 
         // AccountForm
         // 
-        AcceptButton = btnUpdate;
+        AcceptButton = btnClose;
         AutoScaleDimensions = new SizeF(8F, 20F);
         AutoScaleMode = AutoScaleMode.Font;
         CancelButton = btnClose;
-        ClientSize = new Size(400, 385);
+        ClientSize = new Size(400, 229);
         Controls.Add(btnClose);
-        Controls.Add(grpDangerZone);
-        Controls.Add(btnUpdate);
         Controls.Add(txtPlayerId);
         Controls.Add(txtUsername);
         Controls.Add(lblPlayerId);
@@ -142,7 +103,6 @@ partial class AccountForm
         Name = "AccountForm";
         StartPosition = FormStartPosition.CenterParent;
         Text = "Tài khoản của tôi";
-        grpDangerZone.ResumeLayout(false);
         ResumeLayout(false);
         PerformLayout();
     }

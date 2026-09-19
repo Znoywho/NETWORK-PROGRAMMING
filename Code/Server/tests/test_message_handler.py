@@ -1,6 +1,7 @@
 import sys
 import unittest
 import uuid
+from unittest.mock import Mock
 from pathlib import Path
 
 # Tro vao thu muc Server chu khong phai Server/app: neu them app/ vao sys.path
@@ -347,6 +348,9 @@ class MessageHandlerTest(unittest.TestCase):
         handler = self._handler()
         self._login_both(handler)
         room_id = self._start_game(handler)
+        handler.score_player = Mock(
+            return_value={self.alice_id: 984, self.bob_id: 1016}
+        )
 
         self.clock.advance(TURN_TIME_LIMIT_SECONDS - 1)
         self.assertEqual([], handler.tick(), "chua het gio thi khong duoc dung van")
@@ -363,6 +367,9 @@ class MessageHandlerTest(unittest.TestCase):
         self.assertEqual("lose", results[self.alice_id]["result"])
         self.assertEqual("win", results[self.bob_id]["result"])
         self.assertEqual("timeout", results[self.bob_id]["reason"])
+        self.assertEqual(984, results[self.alice_id]["ranking"])
+        self.assertEqual(1016, results[self.bob_id]["ranking"])
+        handler.score_player.assert_called_once()
         self.assertEqual(RoomStatus.FINISHED, self.room_manager.get_room(room_id).status)
         self.assertEqual(PlayerStatus.IDLE, self.player_manager.get_player(self.alice_id).status)
 

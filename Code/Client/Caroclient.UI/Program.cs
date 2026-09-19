@@ -14,7 +14,7 @@ static class Program
         using var loginForm = new LoginForm();
         if (loginForm.ShowDialog() == DialogResult.OK)
         {
-            Application.Run(new Form1(loginForm.Username, loginForm.Password, loginForm.ServerAddress));
+            Application.Run(new Form1(loginForm.Username, loginForm.Password, loginForm.ServerAddress, loginForm.RegisterRequested));
         }
     }    
 }

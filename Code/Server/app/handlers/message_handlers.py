@@ -311,8 +311,8 @@ class MessageHandler:
         # ma khong kiem tra la AttributeError lam chet ca server.
         if not isinstance(username, str) or not username.strip():
             return [self._error("INVALID_MESSAGE", "username is required.")]
-        if not isinstance(password, str) or len(password) < 10:
-            return [self._error("INVALID_MESSAGE", "password must be at least 10 characters.")]
+        if not isinstance(password, str) or len(password) < 6:
+            return [self._error("INVALID_MESSAGE", "password must be at least 6 characters.")]
 
         username = username.strip()
         user = self._check_user(username)
@@ -766,6 +766,14 @@ class MessageHandler:
             self._awaiting_reconnect.pop(room.disconnected_player, None)
             room.disconnected_player = None
         room.reconnect_deadline = None
+
+        # Het gio la mot ket qua thang/thua hop le: tinh Elo giong nhu khi
+        # co nguoi tao duoc day quan thang tren ban co. score_player can
+        # room o trang thai FINISHED, vi vay viec tinh diem nam sau dong
+        # chuyen trang thai o tren va truoc khi tao game_result.
+        if reason == "timeout" and winner_id is not None and rankings is None:
+            winner = 0 if winner_id == room.player_x else 1
+            rankings = self.score_player(room, winner)
 
         recipients = self._room_recipients(room)
         self._persist_match_result(room, winner_id, drawn=drawn)
