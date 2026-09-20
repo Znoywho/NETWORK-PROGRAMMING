@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 # xem da bi bao dung chua.
 POLL_TIMEOUT = 0.5  # giay
 
+# Cho writer ghi not hang doi luc tat server. Rong rai hon POLL_TIMEOUT
+# vi buoc ghi not con co the phai thu lai vai lan.
+SHUTDOWN_TIMEOUT = 10  # giay
+
 # --- Task 9: xu ly loi ghi database ---------------------------------
 # So lan thu lai toi da cho mot event truoc khi bo cuoc.
 MAX_RETRIES = 3
@@ -61,6 +65,8 @@ class DBWriter(threading.Thread):
                 # Luon goi, ke ca khi that bai, de join() khong treo vinh vien.
                 self.queue.task_done()
 
+        # Da bi bao dung, nhung hang doi co the con viec: ghi not roi moi di.
+        self._drain()
         self._close_session()
         logger.info(
             "DB Writer dung. Thong ke: ghi ok=%d, phai thu lai=%d, bo=%d",
@@ -70,7 +76,28 @@ class DBWriter(threading.Thread):
     def stop(self) -> None:
         self._running = False
         if self.is_alive():
-            self.join(timeout=5)
+            self.join(timeout=SHUTDOWN_TIMEOUT)
+
+    def _drain(self) -> None:
+        """Ghi not nhung viec con ket lai trong hang doi truoc khi dung han.
+
+        Vong lap chinh kiem tra `_running` o dau moi nhip, nen khi server
+        bao dung no thoat ngay va bo lai moi thu chua lay ra. Do la duong
+        mat du lieu lang le nhat: khong loi, khong dead-letter, thong ke
+        van bao `dropped=0`. Nen phai vet not o day.
+        """
+        while True:
+            try:
+                event = self.queue.get(timeout=0)
+            except queue.Empty:
+                return
+
+            try:
+                self._write_with_retry(event)
+            except Exception:
+                logger.exception("Loi khi ghi not event luc tat")
+            finally:
+                self.queue.task_done()
 
     # ----------------------------------------------------------------
     #  Task 9: vong thu lai
@@ -205,8 +232,10 @@ class DBWriter(threading.Thread):
             )
 
         else:
-            logger.error("Khong biet op %s, bo qua", op)
-            return
+            # Raise chu khong return: nhanh `except Exception` ben
+            # _write_with_retry moi dem duoc la `dropped` va luu vao
+            # dead-letter. Return lang le se bi tinh nham la ghi thanh cong.
+            raise ValueError(f"Khong biet op: {op}")
 
         self._session.commit()
 
