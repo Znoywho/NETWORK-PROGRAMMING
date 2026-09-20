@@ -32,7 +32,6 @@ NETPRO/
 ├── Code/
 │   ├── Server/
 │   │   ├── app/
-│   │   │   ├── ai/              # chua co noi dung
 │   │   │   ├── game/            # luat co caro, kiem tra thang thua
 │   │   │   ├── handlers/        # xu ly tung loai message
 │   │   │   ├── matchmaking/     # quan ly nguoi choi, phong, loi moi
@@ -44,7 +43,6 @@ NETPRO/
 │   │   │   ├── db.py
 │   │   │   └── main.py
 │   │   ├── migrations/init.sql
-│   │   ├── notebook/
 │   │   ├── tests/
 │   │   ├── Dockerfile
 │   │   └── requirements.txt
@@ -133,7 +131,6 @@ Dependency server (`Code/Server/requirements.txt`):
 - psycopg2-binary, asyncpg — driver PostgreSQL
 - bcrypt — băm mật khẩu
 - python-dotenv — đọc file `.env`
-- numpy, pandas, scikit-learn — phục vụ phần AI trong `notebook/`
 
 ## Cài đặt
 
