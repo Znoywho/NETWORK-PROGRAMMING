@@ -192,6 +192,15 @@ class MessageHandlerTest(unittest.TestCase):
         self.assertEqual(RoomStatus.PLAYING, room.status)
         self.assertEqual({self.alice_id, self.bob_id}, set(accepted[0]["targets"]))
         self.assertEqual(self.alice_id, state["currentPlayerId"])
+        online = next(
+            delivery["payload"]
+            for delivery in accepted
+            if delivery["payload"]["type"] == "online_players"
+        )
+        self.assertEqual(
+            {self.alice_id: "playing", self.bob_id: "playing"},
+            {entry["playerId"]: entry["status"] for entry in online["players"]},
+        )
 
     def test_winning_move_sends_personal_win_and_lose_results(self):
         handler = self._handler(board_factory=lambda: Caro(1, 1, winning_condition=1))
@@ -319,6 +328,15 @@ class MessageHandlerTest(unittest.TestCase):
 
         spectator = self.player_manager.get_player(spectator_id)
         self.assertEqual(PlayerStatus.SPECTATING, spectator.status)
+        online = next(
+            delivery["payload"]
+            for delivery in result
+            if delivery["payload"]["type"] == "online_players"
+        )
+        spectator_entry = next(
+            entry for entry in online["players"] if entry["playerId"] == spectator_id
+        )
+        self.assertEqual("spectating", spectator_entry["status"])
         self.assertEqual(room.room_id, spectator.current_room_id)
 
     def test_server_delivery_routes_origin_targeted_and_broadcast_messages(self):
