@@ -430,7 +430,13 @@ class MessageHandler:
         room.status = RoomStatus.PLAYING
         self._start_turn(room)
 
-        return [self._targeted(self._room_recipients(room), self._game_state(room))]
+        return [
+            self._targeted(self._room_recipients(room), self._game_state(room)),
+            # InviteManager da chuyen ca hai nguoi choi sang PLAYING.
+            # Broadcast ngay de moi client khong tiep tuc hien thi ban sao
+            # danh sach cu voi trang thai IDLE.
+            self._broadcast_online_players(),
+        ]
 
     def _reject_invite_handler(self, player_id: str, message: dict[str, Any]) -> list[dict[str, Any]]:
         invite_id = message.get("inviteId")
