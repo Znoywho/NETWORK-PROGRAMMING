@@ -1,3 +1,5 @@
+import os
+
 from sqlalchemy import create_engine
 
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -7,14 +9,14 @@ from sqlalchemy.orm import declarative_base
 BASE = declarative_base()
 DATABASE_URL = Config.DATABASE_URI
 
-print("run engine")
 engine = create_engine(
         DATABASE_URL,
-        echo=True,
+        # SQLAlchemy's raw SQL trace floods the server terminal and can expose
+        # query values.  The live demo prints the rows it verifies instead.
+        echo=os.getenv("CARO_SQL_ECHO", "false").lower() == "true",
         pool_pre_ping=True, # auto reconnect
         pool_recycle=1800   #recycle connect after 30 minutes
         )
-print("run session local")
 
 SessionLocal = scoped_session(sessionmaker(bind=engine))# Create Thread safety 
 

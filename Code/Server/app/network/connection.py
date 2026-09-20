@@ -35,6 +35,13 @@ class Connection:
             data = self.sock.recv(4096)
         except BlockingIOError:
             return []
+        except (ConnectionError, OSError) as exc:
+            # Closing a TCP socket can arrive either as EOF (``recv`` returns
+            # b"") or as ECONNRESET/another socket error.  Both mean the
+            # same thing to the selector loop: run MessageHandler.disconnect
+            # so the match enters its reconnect grace period instead of
+            # crashing the whole server.
+            raise RuntimeError("Peer connection lost.") from exc
 
         if not data:
             raise RuntimeError("Peer closed.")

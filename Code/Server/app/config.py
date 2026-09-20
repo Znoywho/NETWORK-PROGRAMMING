@@ -15,6 +15,3 @@ else:
 
 class Config:
     DATABASE_URI = DATABASE_URL
-
-
-print(Config.DATABASE_URI)
