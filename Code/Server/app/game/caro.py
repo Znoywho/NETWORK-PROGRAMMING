@@ -211,6 +211,44 @@ class Caro:
                     return False
         return True
 
+    def get_game_result(self):
+        """
+        Kiểm tra ván đấu đã kết thúc chưa (thắng/thua/hoà), nếu kết thúc thì:
+        - Cập nhật self.status = "finished"
+        - Trả về message dạng dict (kèm lý do) để gửi qua game_result
+ 
+        Trả về None nếu ván đấu chưa kết thúc.
+        """
+        winner_code = self._get_winner()
+ 
+        if winner_code == -1:
+            return None  # ván đấu chưa kết thúc, không sinh message
+ 
+        self.status = "finished"
+ 
+        if winner_code == 0:
+            return {
+                "type": "game_result",
+                "result": "win",
+                "winner": self.player_X,
+                "reason": f"Người chơi {self.player_X} có {self.winning_condition} quân liên tiếp",
+            }
+ 
+        if winner_code == 1:
+            return {
+                "type": "game_result",
+                "result": "win",
+                "winner": self.player_O,
+                "reason": f"Người chơi {self.player_O} có {self.winning_condition} quân liên tiếp",
+            }
+ 
+        # winner_code == 2 => hoà
+        return {
+            "type": "game_result",
+            "result": "draw",
+            "winner": None,
+            "reason": "Bàn cờ đã đầy, không có người chơi nào đủ số quân liên tiếp để thắng",
+        }
 
 def _create_test_board(size=15, empty=True):
     if empty:
@@ -223,3 +261,4 @@ if __name__ == "__main__":
     caro.grid = _create_test_board(5, False)
     caro._visualize_grid()
     print(caro._get_winner())
+    print(caro.get_game_result())
