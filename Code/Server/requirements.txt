@@ -1,4 +1,6 @@
-sqlalchemy
-psycopg2-binary
-bcrypt
-python-dotenv
+# SQLAlchemy 2.1 doi driver mac dinh cua "postgresql://" sang psycopg (v3),
+# nen phai ghim 2.0.x de dung tiep psycopg2-binary duoi day.
+sqlalchemy==2.0.52
+psycopg2-binary==2.9.10
+bcrypt==5.0.0
+python-dotenv==1.0.1

@@ -113,6 +113,10 @@ Mỗi client có một `Connection` (`app/network/connection.py`) giữ socket,
 
 - `BlockingIOError`: chưa có dữ liệu, trả về danh sách rỗng.
 - Nhận được `b""`: peer đã đóng, ném `RuntimeError("Peer closed.")`.
+- `ConnectionError` / `OSError` (TCP reset — client bị kill, rút dây):
+  đổi thành `RuntimeError("Peer connection lost.")`. Nếu để lỗi gốc bay
+  lên thì `_handle_client` không bắt được và cả vòng lặp selector chết
+  theo một client. Test: `tests/test_connection_disconnect.py`.
 - Ngược lại: nối vào `_recv_buff`, gọi `decode_frames`, trả về các
   message đọc trọn.
 
