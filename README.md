@@ -2,14 +2,14 @@
 
 ## Thành viên
 
-| STT | MSSV | Họ và tên | Vai trò |
-|---:|---|---|---|
-| 1 |089206010393| Lê Thiên Hạo | Leader |
-| 2 |082306014560| Phạm Lê Ngọc Hân | Thành viên |
-| 3 |067206003213| Trương Tấn Kiệt | Thành viên |
-| 4 |077206000886| Ngô Minh Đăng Khoa| Thành viên|
-| 5 |084206002822| Trầm Đồng Khởi| Thành viên|
-| 6 |052206000320|Nguyễn Đình Duy Khương | Thành viên|
+| STT | MSSV         | Họ và tên              | Vai trò    |
+| --: | ------------ | ---------------------- | ---------- |
+|   1 | 089206010393 | Lê Thiên Hạo           | Leader     |
+|   2 | 082306014560 | Phạm Lê Ngọc Hân       | Thành viên |
+|   3 | 067206003213 | Trương Tấn Kiệt        | Thành viên |
+|   4 | 077206000886 | Ngô Minh Đăng Khoa     | Thành viên |
+|   5 | 084206002822 | Trầm Đồng Khởi         | Thành viên |
+|   6 | 052206000320 | Nguyễn Đình Duy Khương | Thành viên |
 
 ## Giới thiệu
 
@@ -108,10 +108,10 @@ Server gửi về client:
 
 ### Luật thời gian
 
-| Mốc | Giá trị | Hết hạn thì sao |
-|---|---|---|
-| Thời gian suy nghĩ mỗi lượt | 30 giây | Người đang tới lượt bị xử thua |
-| Thời gian được phép kết nối lại | 60 giây | Đối thủ được xử thắng |
+| Mốc                             | Giá trị | Hết hạn thì sao                |
+| ------------------------------- | ------- | ------------------------------ |
+| Thời gian suy nghĩ mỗi lượt     | 30 giây | Người đang tới lượt bị xử thua |
+| Thời gian được phép kết nối lại | 60 giây | Đối thủ được xử thắng          |
 
 Trong lúc chờ một người kết nối lại, đồng hồ suy nghĩ tạm dừng; người quay lại kịp hạn được cấp trọn vẹn một lượt mới. Hai hằng số nằm ở đầu `Code/Server/app/handlers/message_handlers.py`.
 
@@ -236,6 +236,35 @@ Thông tin database khai trong `docker-compose.yml` (mục `db.environment`):
 - [x] Cho phép người chơi kết nối lại trong thời gian cho phép.
 - [x] Xem danh sách các trận đang diễn ra để chọn phòng khán giả.
 
+## Giao diện
+
+- Giao diện đăng nhập, đăng ký:
+  ![alt text](image.png)
+- Giao diện chính của trò chơi Caro:
+  ![alt text](image-2.png)
+- Menu chức năng của trò chơi:
+  ![alt text](image-3.png)
+- Menu thông tin người chơi:
+  ![alt text](image-4.png)
+- Giao diện thông tin tài khoản (tên và ID người chơi):
+  ![alt text](image-8.png)
+- Giao diện hồ sơ cá nhân (thông tin người chơi và điểm tích lũy):
+  ![alt text](image-9.png)
+- Giao diện nhận lời mời thi đấu:
+  ![alt text](image-5.png)
+- Giao diện thi đấu Caro (bàn cờ, lượt chơi và thời gian suy nghĩ):
+  ![alt text](<Screenshot 2026-09-24 172754.png>)
+- Giao diện kết thúc ván đấu (thông báo chiến thắng và cập nhật điểm):
+  ![alt text](image-6.png)
+- Giao diện kết thúc ván đấu (thông báo thua cuộc và cập nhật điểm):
+  ![alt text](image-7.png)
+- Giao diện chọn trận để xem (danh sách các trận đấu đang diễn ra):
+  ![alt text](<Screenshot 2026-09-24 173500.png>)
+- Giao diện xem trận đấu (theo dõi bàn cờ với vai trò khán giả):
+  ![alt text](image-10.png)
+- Danh sách người chơi trực tuyến và trạng thái (đang thi đấu, đang xem trận):
+  ![alt text](<Screenshot 2026-09-24 173514.png>)
+
 ## Kiểm thử
 
 Test hiện có trong `Code/Server/`:
@@ -260,15 +289,15 @@ Bằng chứng kiểm thử, hình ảnh, video demo và log lưu tại `Extra/`
 
 ## Tài liệu
 
-| Tài liệu | Nội dung |
-|---|---|
-| `Extra/network-protocol.md` | Framing, vòng lặp selectors, vòng đời kết nối, cách chọn người nhận |
-| `Extra/database-schema.md` | Ba bảng, ràng buộc, quan hệ, cách kết nối database |
-| `Extra/queue-event-format.md` | Format event đi qua hàng đợi xuống DB Writer |
-| `Extra/er-diagram-database.mmd` | Sơ đồ ER (mở bằng GitHub hoặc mermaid.live) |
-| `Extra/queue-event-flow.mmd` | Sơ đồ luồng event qua hàng đợi |
-| `Code/Shared/message-schema.json` | Schema JSON của toàn bộ message |
-| `Code/requirements.md` | Yêu cầu đề bài |
+| Tài liệu                          | Nội dung                                                            |
+| --------------------------------- | ------------------------------------------------------------------- |
+| `Extra/network-protocol.md`       | Framing, vòng lặp selectors, vòng đời kết nối, cách chọn người nhận |
+| `Extra/database-schema.md`        | Ba bảng, ràng buộc, quan hệ, cách kết nối database                  |
+| `Extra/queue-event-format.md`     | Format event đi qua hàng đợi xuống DB Writer                        |
+| `Extra/er-diagram-database.mmd`   | Sơ đồ ER (mở bằng GitHub hoặc mermaid.live)                         |
+| `Extra/queue-event-flow.mmd`      | Sơ đồ luồng event qua hàng đợi                                      |
+| `Code/Shared/message-schema.json` | Schema JSON của toàn bộ message                                     |
+| `Code/requirements.md`            | Yêu cầu đề bài                                                      |
 
 ## Demo
 
