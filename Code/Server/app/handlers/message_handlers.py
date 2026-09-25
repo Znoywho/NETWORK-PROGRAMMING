@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import time
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -21,8 +20,6 @@ from app.models.match import Match
 from app.models.user import User
 from app.queue.db_queue import Op, db_queue
 
-logger = logging.getLogger(__name__)
-
 BOARD_ROWS = 15
 BOARD_COLS = 15
 WINNING_CONDITION = 5
@@ -38,30 +35,10 @@ K = 32
 # Dong ho suy nghi bi TAM DUNG trong luc cho ket noi lai, va duoc cap
 # lai tron ven khi nguoi choi tro ve — neu khong, mang chap chon se an
 # mat luot cua ho hai lan.
+TURN_TIME_LIMIT_SECONDS = 30
+RECONNECT_GRACE_SECONDS = 60
 
-
-def _positive_int_env(name: str, default: int) -> int:
-    """Doc mot moc thoi gian tu bien moi truong, bo qua gia tri vo nghia.
-
-    Chi nhan so nguyen duong: sai dinh dang hoac <= 0 thi dung lai mac dinh,
-    nen khong the vo tinh chay server voi han 0 giay.
-    """
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        value = int(raw)
-    except ValueError:
-        logger.warning("%s=%r khong phai so nguyen, dung mac dinh %s", name, raw, default)
-        return default
-    if value <= 0:
-        logger.warning("%s=%s khong duong, dung mac dinh %s", name, value, default)
-        return default
-    return value
-
-
-TURN_TIME_LIMIT_SECONDS = _positive_int_env("CARO_TURN_TIME_LIMIT_SECONDS", 30)
-RECONNECT_GRACE_SECONDS = _positive_int_env("CARO_RECONNECT_GRACE_SECONDS", 60)
+logger = logging.getLogger(__name__)
 
 
 def as_db_id(value: object) -> int | None:

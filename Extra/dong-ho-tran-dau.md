@@ -219,28 +219,7 @@ thắng thua do `tick()` quyết định, không do đồng hồ của client.
 
 ---
 
-## 9. Đổi thời gian khi chạy demo
-
-Hai hằng số đọc từ biến môi trường, mặc định vẫn là luật công bố:
-
-```bash
-cd Code
-CARO_RECONNECT_GRACE_SECONDS=3 docker compose up --build
-```
-
-| Biến | Mặc định |
-|---|---|
-| `CARO_TURN_TIME_LIMIT_SECONDS` | 30 |
-| `CARO_RECONNECT_GRACE_SECONDS` | 60 |
-
-`_positive_int_env` chỉ nhận số nguyên dương; giá trị sai định dạng hoặc `<= 0`
-bị bỏ qua và dùng lại mặc định, nên không thể vô tình chạy server với hạn 0 giây.
-Hai biến này đã được khai trong `Code/docker-compose.yml` để `docker compose`
-truyền thẳng vào container.
-
----
-
-## 10. Test tương ứng
+## 9. Test tương ứng
 
 Handler nhận đồng hồ qua tham số `clock` (mặc định `time.monotonic`), nên test
 tiêm đồng hồ giả và "tua" thời gian thay vì ngồi chờ 30 giây thật.
@@ -266,7 +245,7 @@ reconnect / disconnect; phần đó hiện chỉ kiểm tra bằng tay khi demo.
 
 ---
 
-## 11. Giới hạn hiện tại
+## 10. Giới hạn hiện tại
 
 **Sai số 1 giây.** `tick()` chạy mỗi giây nên người chơi có thể được thêm tối
 đa gần 1 giây so với mốc lý thuyết. Chấp nhận được với luật 30/60 giây; muốn

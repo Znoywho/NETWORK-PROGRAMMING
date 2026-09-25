@@ -115,7 +115,7 @@ Server gửi về client:
 
 Hai đồng hồ không bao giờ chạy cùng lúc: mất kết nối giữa trận thì phòng được giữ nguyên, đồng hồ suy nghĩ **tạm dừng** và mở hạn 60 giây; quay lại kịp thì được cấp trọn vẹn một lượt mới, quá hạn thì `tick()` mới kết thúc ván. Chủ động rời phòng (`leave_room`) bị xử thua ngay, không có ân hạn.
 
-Hai hằng số nằm ở đầu `Code/Server/app/handlers/message_handlers.py`, đổi được bằng biến môi trường `CARO_TURN_TIME_LIMIT_SECONDS` / `CARO_RECONNECT_GRACE_SECONDS` khi cần demo nhanh. Bảng chuyển trạng thái đầy đủ, luồng mất kết nối / kết nối lại từng bước và các trường hợp biên: `Extra/dong-ho-tran-dau.md`.
+Hai hằng số nằm ở đầu `Code/Server/app/handlers/message_handlers.py`. Bảng chuyển trạng thái đầy đủ, luồng mất kết nối / kết nối lại từng bước và các trường hợp biên: `Extra/dong-ho-tran-dau.md`.
 
 Schema đầy đủ của từng message ở `Code/Shared/message-schema.json`. Giải thích chi tiết cách đóng khung và cách server chọn người nhận ở `Extra/network-protocol.md`.
 
@@ -282,14 +282,6 @@ python -m tests.test_invite_manager
 python -m tests.test_invite_improvements
 python -m app.queue.test_queue
 python -m app.queue.test_db_writer
-```
-
-Khi cần chạy nhanh phần đồng hồ lúc demo, hai mốc thời gian đọc được từ biến
-môi trường (xem `Extra/dong-ho-tran-dau.md`, mục "Đổi thời gian khi chạy demo"):
-
-```bash
-cd Code
-CARO_RECONNECT_GRACE_SECONDS=3 docker compose up --build
 ```
 
 Các nhóm kiểm thử dự kiến:
