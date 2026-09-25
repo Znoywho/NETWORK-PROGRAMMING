@@ -4,6 +4,10 @@ services:
     container_name: caro-server
     environment:
       - RUNNING_IN_DOCKER=true
+      # Keep the real-game defaults, but allow a short deadline when presenting
+      # the disconnect integration demo (for example: ...=3 docker compose up).
+      - CARO_TURN_TIME_LIMIT_SECONDS=${CARO_TURN_TIME_LIMIT_SECONDS:-30}
+      - CARO_RECONNECT_GRACE_SECONDS=${CARO_RECONNECT_GRACE_SECONDS:-60}
     ports:
       - "8765:8765"
     env_file:

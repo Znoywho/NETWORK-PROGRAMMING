@@ -38,7 +38,6 @@ NETPRO/
 │   │   │   ├── models/          # model SQLAlchemy + dataclass trong RAM
 │   │   │   ├── network/         # socket, framing, vong lap selectors
 │   │   │   ├── queue/           # hang doi ghi database + DB writer
-│   │   │   ├── ui/              # man hinh theo doi server trong terminal
 │   │   │   ├── config.py
 │   │   │   ├── db.py
 │   │   │   └── main.py
@@ -108,12 +107,15 @@ Server gửi về client:
 
 ### Luật thời gian
 
-| Mốc                             | Giá trị | Hết hạn thì sao                |
-| ------------------------------- | ------- | ------------------------------ |
-| Thời gian suy nghĩ mỗi lượt     | 30 giây | Người đang tới lượt bị xử thua |
-| Thời gian được phép kết nối lại | 60 giây | Đối thủ được xử thắng          |
+| Mốc                             | Giá trị | Hết hạn thì sao                                     | Ranking     |
+| ------------------------------- | ------- | --------------------------------------------------- | ----------- |
+| Thời gian suy nghĩ mỗi lượt     | 30 giây | Người đang tới lượt bị xử thua (`reason = timeout`)  | Có tính Elo |
+| Thời gian được phép kết nối lại | 60 giây | Đối thủ được xử thắng (`reason = disconnect`)        | Không đổi   |
+| Nhịp server đối chiếu đồng hồ   | 1 giây  | —                                                   | —           |
 
-Trong lúc chờ một người kết nối lại, đồng hồ suy nghĩ tạm dừng; người quay lại kịp hạn được cấp trọn vẹn một lượt mới. Hai hằng số nằm ở đầu `Code/Server/app/handlers/message_handlers.py`.
+Hai đồng hồ không bao giờ chạy cùng lúc: mất kết nối giữa trận thì phòng được giữ nguyên, đồng hồ suy nghĩ **tạm dừng** và mở hạn 60 giây; quay lại kịp thì được cấp trọn vẹn một lượt mới, quá hạn thì `tick()` mới kết thúc ván. Chủ động rời phòng (`leave_room`) bị xử thua ngay, không có ân hạn.
+
+Hai hằng số nằm ở đầu `Code/Server/app/handlers/message_handlers.py`, đổi được bằng biến môi trường `CARO_TURN_TIME_LIMIT_SECONDS` / `CARO_RECONNECT_GRACE_SECONDS` khi cần demo nhanh. Bảng chuyển trạng thái đầy đủ, luồng mất kết nối / kết nối lại từng bước và các trường hợp biên: `Extra/dong-ho-tran-dau.md`.
 
 Schema đầy đủ của từng message ở `Code/Shared/message-schema.json`. Giải thích chi tiết cách đóng khung và cách server chọn người nhận ở `Extra/network-protocol.md`.
 
@@ -128,7 +130,7 @@ Schema đầy đủ của từng message ở `Code/Shared/message-schema.json`. 
 Dependency server (`Code/Server/requirements.txt`):
 
 - sqlalchemy — ORM và quản lý connection pool
-- psycopg2-binary, asyncpg — driver PostgreSQL
+- psycopg2-binary — driver PostgreSQL
 - bcrypt — băm mật khẩu
 - python-dotenv — đọc file `.env`
 
@@ -238,32 +240,34 @@ Thông tin database khai trong `docker-compose.yml` (mục `db.environment`):
 
 ## Giao diện
 
-- Giao diện đăng nhập, đăng ký:
-  ![alt text](image.png)
-- Giao diện chính của trò chơi Caro:
-  ![alt text](image-2.png)
-- Menu chức năng của trò chơi:
-  ![alt text](image-3.png)
-- Menu thông tin người chơi:
-  ![alt text](image-4.png)
-- Giao diện thông tin tài khoản (tên và ID người chơi):
-  ![alt text](image-8.png)
-- Giao diện hồ sơ cá nhân (thông tin người chơi và điểm tích lũy):
-  ![alt text](image-9.png)
-- Giao diện nhận lời mời thi đấu:
-  ![alt text](image-5.png)
-- Giao diện thi đấu Caro (bàn cờ, lượt chơi và thời gian suy nghĩ):
-  ![alt text](<Screenshot 2026-09-24 172754.png>)
-- Giao diện kết thúc ván đấu (thông báo chiến thắng và cập nhật điểm):
-  ![alt text](image-6.png)
-- Giao diện kết thúc ván đấu (thông báo thua cuộc và cập nhật điểm):
-  ![alt text](image-7.png)
-- Giao diện chọn trận để xem (danh sách các trận đấu đang diễn ra):
-  ![alt text](<Screenshot 2026-09-24 173500.png>)
-- Giao diện xem trận đấu (theo dõi bàn cờ với vai trò khán giả):
-  ![alt text](image-10.png)
-- Danh sách người chơi trực tuyến và trạng thái (đang thi đấu, đang xem trận):
-  ![alt text](<Screenshot 2026-09-24 173514.png>)
+Ảnh chụp màn hình client WinForms, đặt tại `Extra/screenshots/`.
+
+- Đăng nhập / đăng ký, có ô nhập địa chỉ server:
+  ![Màn hình đăng nhập](Extra/screenshots/01-dang-nhap.png)
+- Màn hình chính: bàn cờ 15×15, danh sách người chơi online, log kết nối:
+  ![Màn hình chính](Extra/screenshots/02-giao-dien-chinh.png)
+- Menu `Menu` — New game, Quit:
+  ![Menu chức năng](Extra/screenshots/03-menu-chuc-nang.png)
+- Menu `Thông tin` — Tài khoản của tôi, Hồ sơ của tôi:
+  ![Menu thông tin](Extra/screenshots/04-menu-thong-tin.png)
+- Tài khoản của tôi: tên và ID người chơi:
+  ![Cửa sổ tài khoản của tôi](Extra/screenshots/05-tai-khoan-cua-toi.png)
+- Hồ sơ của tôi: thông tin người chơi và điểm tích luỹ:
+  ![Cửa sổ hồ sơ cá nhân](Extra/screenshots/06-ho-so-ca-nhan.png)
+- Nhận lời mời thi đấu — Chấp nhận / Từ chối:
+  ![Khung lời mời thi đấu](Extra/screenshots/07-nhan-loi-moi.png)
+- Đang thi đấu: quân X/O trên bàn cờ, lượt đi và đồng hồ suy nghĩ đếm ngược:
+  ![Màn hình đang thi đấu](Extra/screenshots/08-dang-thi-dau.png)
+- Kết thúc ván — thắng, điểm cập nhật `+8`:
+  ![Thông báo thắng](Extra/screenshots/09-ket-thuc-thang.png)
+- Kết thúc ván — thua, điểm cập nhật `-8`:
+  ![Thông báo thua](Extra/screenshots/10-ket-thuc-thua.png)
+- Chọn trận để xem: danh sách trận đang diễn ra kèm số nước, số khán giả, thời gian còn lại:
+  ![Hộp thoại chọn trận để xem](Extra/screenshots/11-chon-tran-de-xem.png)
+- Xem trận với vai trò khán giả:
+  ![Màn hình khán giả](Extra/screenshots/12-xem-tran-khan-gia.png)
+- Danh sách người chơi online kèm trạng thái `playing` / `spectating`:
+  ![Danh sách người chơi online](Extra/screenshots/13-danh-sach-online.png)
 
 ## Kiểm thử
 
@@ -271,10 +275,21 @@ Test hiện có trong `Code/Server/`:
 
 ```bash
 cd Code/Server
-python -m unittest tests.test_message_handler   # dang unittest
-python tests/test_room_cleanup.py               # dang script
-python app/queue/test_queue.py
-python app/queue/test_db_writer.py
+python -m unittest tests.test_message_handler     # 15 test: login, moi dau, danh co, dong ho, reconnect
+python -m unittest tests.test_caro_validate_move  # luat co: nuoc di hop le, thang thua
+python -m tests.test_room_cleanup                 # dang script
+python -m tests.test_invite_manager
+python -m tests.test_invite_improvements
+python -m app.queue.test_queue
+python -m app.queue.test_db_writer
+```
+
+Khi cần chạy nhanh phần đồng hồ lúc demo, hai mốc thời gian đọc được từ biến
+môi trường (xem `Extra/dong-ho-tran-dau.md`, mục "Đổi thời gian khi chạy demo"):
+
+```bash
+cd Code
+CARO_RECONNECT_GRACE_SECONDS=3 docker compose up --build
 ```
 
 Các nhóm kiểm thử dự kiến:
@@ -289,19 +304,22 @@ Bằng chứng kiểm thử, hình ảnh, video demo và log lưu tại `Extra/`
 
 ## Tài liệu
 
-| Tài liệu                          | Nội dung                                                            |
-| --------------------------------- | ------------------------------------------------------------------- |
-| `Extra/network-protocol.md`       | Framing, vòng lặp selectors, vòng đời kết nối, cách chọn người nhận |
-| `Extra/database-schema.md`        | Ba bảng, ràng buộc, quan hệ, cách kết nối database                  |
-| `Extra/queue-event-format.md`     | Format event đi qua hàng đợi xuống DB Writer                        |
-| `Extra/er-diagram-database.mmd`   | Sơ đồ ER (mở bằng GitHub hoặc mermaid.live)                         |
-| `Extra/queue-event-flow.mmd`      | Sơ đồ luồng event qua hàng đợi                                      |
-| `Code/Shared/message-schema.json` | Schema JSON của toàn bộ message                                     |
-| `Code/requirements.md`            | Yêu cầu đề bài                                                      |
+| Tài liệu                          | Nội dung                                                                                      |
+| --------------------------------- | --------------------------------------------------------------------------------------------- |
+| `Extra/network-protocol.md`       | Framing, vòng lặp selectors, vòng đời kết nối, cách chọn người nhận                            |
+| `Extra/dong-ho-tran-dau.md`       | Đồng hồ lượt, xử lý mất kết nối và hạn kết nối lại — bảng chuyển trạng thái, trường hợp biên   |
+| `Extra/database-schema.md`        | Ba bảng, ràng buộc, quan hệ, cách kết nối database                                             |
+| `Extra/queue-event-format.md`     | Format event đi qua hàng đợi xuống DB Writer                                                   |
+| `Extra/er-diagram-database.mmd`   | Sơ đồ ER (mở bằng GitHub hoặc mermaid.live)                                                    |
+| `Extra/queue-event-flow.mmd`      | Sơ đồ luồng event qua hàng đợi                                                                 |
+| `Extra/test-evidence/`            | Log và ảnh chụp kết quả kiểm thử                                                               |
+| `Extra/screenshots/`              | Ảnh chụp màn hình client dùng trong mục Giao diện                                              |
+| `Code/Shared/message-schema.json` | Schema JSON của toàn bộ message                                                                |
+| `Code/requirements.md`            | Yêu cầu đề bài                                                                                 |
 
 ## Demo
 
-- Video demo: cập nhật sau.
+- Video demo: https://youtu.be/xewhg6WSvs4
 - Slide thuyết trình: `PPTX/`.
 - Báo cáo: `DOCX/`.
 
@@ -309,7 +327,8 @@ Bằng chứng kiểm thử, hình ảnh, video demo và log lưu tại `Extra/`
 
 - Chưa chặn trần độ dài frame và chưa có heartbeat: client rút dây mạng đột ngột thì server chỉ biết khi TCP tự phát hiện, nên đồng hồ 60 giây chờ kết nối lại bắt đầu muộn hơn thực tế — xem mục "Giới hạn hiện tại" trong `Extra/network-protocol.md`.
 - Kết nối lại nghĩa là đăng nhập lại bằng username/password, chưa có session token.
-- Thua vì hết giờ hoặc vì bỏ trận không tính vào điểm ranking (chỉ ván kết thúc trên bàn cờ mới tính).
+- Thua vì bỏ trận (`leave_room`) hoặc vì hết hạn kết nối lại không tính vào điểm ranking; thắng trên bàn cờ và thắng do đối thủ hết giờ thì có tính.
+- Điểm ranking không có sàn: xuất phát từ 0 nên người thua nhiều sẽ xuống số âm (thấy trong ảnh mục Giao diện).
 - Model `User` trong `app/models/user.py` lệch kiểu thời gian so với `migrations/init.sql`.
 - Chưa có công cụ migration: đổi schema phải xoá volume và tạo lại database từ đầu.
 - Test còn ít và phần lớn viết dạng script, chưa gom về một bộ chạy chung.

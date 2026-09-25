@@ -134,44 +134,157 @@ thể đã bị đóng từ phía kia.
 
 ---
 
-## Đồng hồ: hết giờ suy nghĩ và hạn kết nối lại
+## Luồng một message đi hết vòng
 
-Hai mốc thời gian được giữ ngay trong `Room`
-(`app/models/matchmaking_models.py`), đo bằng `time.monotonic()` — đồng
-hồ đơn điệu, không nhảy khi máy đổi giờ hệ thống:
+Lấy một nước cờ làm ví dụ, đi từ byte trên dây mạng tới byte trả về:
 
-| Trường | Ý nghĩa |
-|---|---|
-| `turn_deadline` | Thời điểm người đang tới lượt hết giờ suy nghĩ |
-| `reconnect_deadline` | Hạn chót để `disconnected_player` đăng nhập lại |
+```text
+  CLIENT ──► [4B len][{"type":"make_move",...}] ──► TCP
+                                                    │
+ ┌──────────────────────────────────────────────────▼──────────────────┐
+ │ TẦNG MẠNG — app/network/                                            │
+ │                                                                     │
+ │  server.py   sel.select() báo EVENT_READ trên socket này            │
+ │      │                                                              │
+ │  connection.py  recv()  đọc ≤4096 byte, nối vào _recv_buff          │
+ │      │                                                              │
+ │  protocol.py  decode_frames()  cắt buffer thành list[dict]          │
+ │      │          (thiếu byte → giữ lại chờ lần recv sau)             │
+ └──────┼──────────────────────────────────────────────────────────────┘
+        ▼  dict thuần, không còn dấu vết socket
+ ┌─────────────────────────────────────────────────────────────────────┐
+ │ TẦNG LUẬT — app/handlers/message_handlers.py                        │
+ │                                                                     │
+ │  handle(msg, sock) → tra player_id → _make_move_handler()           │
+ │      │  kiểm tra lượt, ô trống, trong bàn cờ                        │
+ │      │  đẩy nước đi vào hàng đợi DB (không chờ commit)  ──────┐     │
+ │      │  _start_turn() nạp lại đồng hồ                        │     │
+ │      ▼                                                       │     │
+ │  trả về [{"targets": ["3","7"], "payload": {...}}]           │     │
+ └──────┼───────────────────────────────────────────────────────┼─────┘
+        ▼  chỉ là danh sách dict                                ▼
+ ┌──────────────────────────────────────────────┐      ┌───────────────┐
+ │ TẦNG MẠNG (chiều ra) — server.py             │      │ DBWriter      │
+ │                                              │      │ (thread riêng)│
+ │  _dispatch()  đọc targets → tra PlayerManager│      │ commit vào    │
+ │      │        lấy Connection tương ứng       │      │ PostgreSQL    │
+ │  connection.py  send() → nối vào _send_buff  │      └───────────────┘
+ │      │          bật thêm EVENT_WRITE         │
+ │  flush()  khi socket sẵn sàng ghi ──────────────► TCP ──► CLIENT
+ └──────────────────────────────────────────────┘
+```
 
-Luật nhóm công bố (hằng số trong `app/handlers/message_handlers.py`):
+Bốn điều đáng chú ý:
 
-- `TURN_TIME_LIMIT_SECONDS = 30` — hết giờ thì người đang tới lượt **thua**.
-- `RECONNECT_GRACE_SECONDS = 60` — mất kết nối giữa trận thì phòng được
-  giữ nguyên trong 60 giây; quay lại kịp thì đánh tiếp, quá hạn thì đối
-  thủ **thắng**.
+1. **Không tầng nào nhảy cóc.** `protocol.py` không biết socket,
+   `message_handlers.py` không biết socket, `server.py` không biết luật
+   cờ. Mỗi tầng chỉ nói chuyện với tầng kề.
+2. **Handler không tự gửi.** Nó trả về "delivery", `_dispatch` mới là
+   nơi duy nhất chạm vào socket. Nhờ vậy test luật chơi bằng dict thuần,
+   không cần dựng server thật.
+3. **Ghi database không nằm trên đường trả lời.** Handler đẩy event vào
+   hàng đợi rồi đi tiếp, client nhận nước cờ trước khi DB commit xong.
+4. **Chiều ra là bất đồng bộ.** `send()` chỉ xếp byte vào buffer; byte
+   thật sự ra dây ở `flush()`, có thể ở vòng lặp sau.
 
-Trong lúc chờ kết nối lại, `turn_deadline` bị đặt `None` — đồng hồ suy
-nghĩ **tạm dừng**. Nếu để nó chạy tiếp thì mạng chập chờn sẽ ăn mất lượt
-của người chơi hai lần, một lần vì rớt mạng và một lần vì hết giờ. Khi
-họ trở lại, server cấp trọn vẹn một lượt mới.
+---
 
-`tick()` là nơi duy nhất thời gian trôi qua trở thành message. Nó duyệt
-các phòng đang `playing` và trả về delivery y như một handler bình
-thường, nên `_dispatch` không cần biết message sinh ra từ đâu — chỉ có
-điều delivery từ `tick()` không bao giờ dùng `targets = []` vì không có
+## Quản lý connection — ai giữ cái gì
+
+Một người chơi được ba nơi khác nhau ghi nhớ, mỗi nơi một mục đích:
+
+```text
+        ┌──────────────────────────────────────────────┐
+        │ selectors            fd → Connection         │
+        │   biết socket nào vừa có dữ liệu             │
+        └───────────────────┬──────────────────────────┘
+                            │ data=
+                            ▼
+        ┌──────────────────────────────────────────────┐
+        │ Connection           socket + 2 buffer       │
+        │   đọc/ghi byte, đóng khung, đóng socket      │
+        └───────────────────▲──────────────────────────┘
+                            │ .connection
+        ┌───────────────────┴──────────────────────────┐
+        │ PlayerManager        player_id → Player      │
+        │   ai đang online, đang ở phòng nào           │
+        └───────────────────▲──────────────────────────┘
+                            │ tra ngược khi cần gửi
+        ┌───────────────────┴──────────────────────────┐
+        │ RoomManager          room_id → Room          │
+        │   Room chỉ giữ player_id, KHÔNG giữ socket   │
+        └──────────────────────────────────────────────┘
+```
+
+| Sổ ghi | Khoá → giá trị | Ai ghi vào | Ai xoá đi |
+|---|---|---|---|
+| `selectors.DefaultSelector` | file descriptor → `Connection` | `_accept()` khi có client mới | `Connection.close()` |
+| `PlayerManager._players` | `player_id` → `Player` (có `.connection`) | `_login_handler` → `add_player` | `MessageHandler.disconnect()` |
+| `Room.player_x` / `player_o` / `spectators` | chỉ lưu `player_id` | `accept_invite`, `spectate` | `_end_game_deliveries`, `leave_room` |
+| `MessageHandler._awaiting_reconnect` | `player_id` → `room_id` | `disconnect()` khi đang trong ván | `_resume_after_reconnect` hoặc khi ván kết thúc |
+
+**Ba bất biến của cách chia này:**
+
+1. **Phòng không bao giờ giữ socket.** `Room` chỉ lưu `player_id` dạng
+   chuỗi. Nhờ vậy người chơi rớt mạng rồi vào lại bằng một socket hoàn
+   toàn mới mà phòng không cần sửa gì — chỉ `PlayerManager` đổi con trỏ
+   `connection`. Nếu phòng giữ socket thì mỗi lần kết nối lại phải đi
+   vá tất cả nơi đang tham chiếu tới nó.
+2. **Chỉ `_dispatch` chạm vào socket.** Tầng luật nói "gửi cho
+   player 3 và 7", tầng mạng lo chuyện người đó còn online hay không
+   (`_room_recipients` lọc sẵn người đã offline).
+3. **Một `player_id` tối đa một kết nối sống.** `_login_handler` chặn
+   bằng lỗi `ALREADY_ONLINE`, nên không có chuyện hai socket cùng đánh
+   thay một người.
+
+**Định danh gắn vào lúc nào.** Socket vừa `accept` là vô danh — server
+chỉ biết địa chỉ IP. Phải tới message `login` thành công thì cặp
+`player_id ↔ connection` mới được ghi vào `PlayerManager`. Vì vậy
+`handle()` tra ngược socket → `player_id` bằng
+`find_player_by_socket()`; tra không ra thì chỉ `login` và `create_user`
+được chạy, mọi type khác nhận `UNAUTHENTICATED`.
+
+Hàm tra ngược đó quét tuyến tính qua danh sách người online. Với quy mô
+đồ án thì không đáng kể; muốn gọn hơn thì giữ thêm một dict
+`connection → player_id`. (Field `Connection.player_id` được khai báo
+sẵn cho mục đích này nhưng hiện chưa dùng tới — định danh đang nằm
+hoàn toàn ở `PlayerManager`.)
+
+**Vòng đời một danh tính:**
+
+| Mốc | `selectors` | `PlayerManager` | `Room` |
+|---|---|---|---|
+| Client kết nối | thêm `Connection` | — | — |
+| `login` thành công | không đổi | thêm `player_id → Player` | — |
+| Vào phòng đấu | không đổi | status = `playing` | thêm `player_id` |
+| Rớt kết nối | huỷ đăng ký, đóng socket | **xoá** `player_id` | **giữ nguyên** |
+| `login` lại (socket mới) | thêm `Connection` mới | thêm lại `player_id`, trỏ tới socket mới | không đổi |
+
+Hàng áp chót là điểm mấu chốt của tính năng kết nối lại: người chơi biến
+mất khỏi danh sách online nhưng phòng vẫn nhớ họ, nên chỉ cần đăng nhập
+lại là ghép về đúng ván đang dở. Chi tiết đồng hồ 60 giây xem
+`dong-ho-tran-dau.md`.
+
+---
+
+## Đồng hồ — phần tầng mạng cần biết
+
+Vòng lặp `selectors` gọi `tick()` ở cuối mỗi vòng (`sel.select(timeout=1.0)`
+nên vòng lặp tự thức dậy mỗi giây kể cả khi không ai gửi gì). `tick()` là nơi
+duy nhất thời gian trôi qua trở thành message: nó trả về delivery y như một
+handler bình thường, nên `_dispatch` không cần biết message sinh ra từ đâu —
+chỉ có điều delivery từ `tick()` không bao giờ dùng `targets = []` vì không có
 socket nào "vừa gửi".
 
 Client **không** nhận một message mỗi giây. `game_state` mang sẵn
-`turnTimeLeft` và `turnTimeLimit`, client tự đếm ngược tại chỗ; khán giả
-vào giữa trận cũng nhận đúng hai trường đó nên đồng hồ hiện lên khớp
-ngay. Cách này giữ đúng tinh thần "chỉ gửi khi trạng thái đổi" thay vì
-biến server thành máy phát nhịp.
+`turnTimeLeft` và `turnTimeLimit`, client tự đếm ngược tại chỗ; khán giả vào
+giữa trận cũng nhận đúng hai trường đó nên đồng hồ hiện lên khớp ngay. Cách
+này giữ đúng tinh thần "chỉ gửi khi trạng thái đổi" thay vì biến server thành
+máy phát nhịp.
 
-Mọi đường kết thúc một ván — thắng trên bàn cờ, hết giờ, rời phòng, hết
-hạn kết nối lại — đều đi qua `_end_game_deliveries()`, nên không đường
-nào quên tắt đồng hồ, ghi kết quả hay trả người chơi về `idle`.
+Toàn bộ luật thời gian — hai hằng số 30/60 giây, việc tạm dừng đồng hồ khi mất
+kết nối, bảng chuyển trạng thái, luồng kết nối lại và các trường hợp biên —
+nằm ở `dong-ho-tran-dau.md`.
 
 ---
 
