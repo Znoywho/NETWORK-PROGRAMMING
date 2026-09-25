@@ -1,8 +1,4 @@
-asyncpg==0.29.0
-python-dotenv==1.0.1
-numpy==2.3.5
-pandas
-scikit-learn
 sqlalchemy
 psycopg2-binary
 bcrypt
+python-dotenv
