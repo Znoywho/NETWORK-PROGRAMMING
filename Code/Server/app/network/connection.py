@@ -35,6 +35,12 @@ class Connection:
             data = self.sock.recv(4096)
         except BlockingIOError:
             return []
+        except (ConnectionError, OSError) as exc:
+            # TCP reset (rut day mang, kill client) khong gui FIN nen recv()
+            # nem thang loi he thong. Doi thanh RuntimeError de _handle_client
+            # xu ly giong moi truong hop mat ket noi khac, thay vi lam chet
+            # vong lap selector.
+            raise RuntimeError("Peer connection lost.") from exc
 
         if not data:
             raise RuntimeError("Peer closed.")

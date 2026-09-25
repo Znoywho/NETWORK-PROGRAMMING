@@ -129,7 +129,7 @@ Schema đầy đủ của từng message ở `Code/Shared/message-schema.json`. 
 
 Dependency server (`Code/Server/requirements.txt`):
 
-- sqlalchemy — ORM và quản lý connection pool
+- sqlalchemy — ORM và quản lý connection pool (ghim `2.0.x`: bản `2.1` đổi driver mặc định của `postgresql://` sang psycopg v3)
 - psycopg2-binary — driver PostgreSQL
 - bcrypt — băm mật khẩu
 - python-dotenv — đọc file `.env`
@@ -280,9 +280,63 @@ python -m unittest tests.test_caro_validate_move  # luat co: nuoc di hop le, tha
 python -m tests.test_room_cleanup                 # dang script
 python -m tests.test_invite_manager
 python -m tests.test_invite_improvements
+python -m tests.test_connection_disconnect       # TCP reset khong lam chet vong lap server
 python -m app.queue.test_queue
 python -m app.queue.test_db_writer
 ```
+
+### Demo integration: TCP server + PostgreSQL thật
+
+`tests/demo_live_match.py` chạy một mạch rồi tự kiểm tra: tạo hai tài khoản
+demo tên ngẫu nhiên, chơi bằng TCP thật qua port `8765`, sau đó đọc thẳng các
+bảng `matches`, `moves`, `users` và in ra terminal. Dữ liệu được giữ lại để mở
+PostgreSQL kiểm tra sau demo.
+
+Terminal thứ nhất chạy server (`cd Code && docker compose up --build`), terminal thứ hai:
+
+```bash
+cd Code/Server
+python -m tests.demo_live_match --scenario all
+```
+
+- `--scenario win`: X thắng bằng 5 quân liên tiếp — 9 nước trong bảng `moves`,
+  `matches.result = x_win`, Elo `+16` / `-16`. Kịch bản này còn đo thời gian
+  từng nước: server trả lời client mất bao lâu, và bao lâu sau thì dòng mới có
+  thật trong PostgreSQL — cho thấy client luôn nhận nước cờ trước khi DB commit
+  xong, vì handler chỉ đẩy việc vào hàng đợi rồi đi tiếp.
+- `--scenario reconnect`: X rớt TCP sau 4 nước rồi đăng nhập lại bằng socket
+  mới trong hạn cho phép. Server trả đúng bàn cờ 4 nước đang dở, ván chơi tiếp
+  tới khi X thắng.
+- `--scenario disconnect`: X rớt TCP sau hai nước và không quay lại. Ban đầu
+  `matches.status` vẫn là `playing`; hết hạn 60 giây thì O thắng, DB ghi
+  `result = o_win`, Elo giữ nguyên (thắng do mất kết nối không tính ranking).
+
+### Test tay: hai bot trên TCP thật
+
+`tests/demo_manual.py` là bảng điều khiển tay dùng khi demo trực tiếp: nó mở
+hai client bot X và O bằng đúng khung message của project, bạn gõ lệnh và bot
+làm theo. Mọi bản tin server gửi về đều in ra ngay khi tới, kể cả lúc đang
+ngồi chờ hết 60 giây kết nối lại.
+
+Terminal thứ nhất chạy server, terminal thứ hai:
+
+```bash
+cd Code/Server
+python -m tests.demo_manual
+```
+
+| Lệnh | Việc |
+|---|---|
+| `login` | Tạo hai tài khoản demo mới và đăng nhập cả hai bot |
+| `invite` / `accept` / `reject` | Mời đấu và trả lời lời mời |
+| `move <x\|o> r c` | Cho một bot đánh vào ô `(r, c)` |
+| `auto [n]` | Đánh theo ván mẫu, `n` là số nước |
+| `disconnect <x\|o>` | Đóng TCP socket của bot đó — giả lập rớt mạng |
+| `reconnect <x\|o>` | Mở socket mới, đăng nhập lại bằng chính tài khoản đó |
+| `board` / `players` | In bàn cờ hiện tại / hỏi danh sách người chơi online |
+| `wait [giây]` | Chỉ ngồi nghe server, để xem hết giờ |
+
+Dữ liệu demo được giữ lại trong PostgreSQL để mở ra kiểm tra sau.
 
 Các nhóm kiểm thử dự kiến:
 

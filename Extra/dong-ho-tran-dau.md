@@ -233,15 +233,19 @@ tiêm đồng hồ giả và "tua" thời gian thay vì ngồi chờ 30 giây th
 | `test_reconnect_deadline_expires_and_opponent_wins` | Quá hạn thì đối thủ thắng với `reason = "disconnect"` |
 | `test_timeout_also_locks_the_board` | Hết giờ thì bàn cờ bị khoá, nước đi sau đó bị từ chối |
 
-Cả sáu test nằm trong `tests/test_message_handler.py`:
+Sáu test trên nằm trong `tests/test_message_handler.py`. Ngoài ra:
+
+| Test | Kiểm tra |
+|---|---|
+| `tests/test_connection_disconnect.py` | TCP reset thành tín hiệu disconnect chứ không làm chết vòng lặp server |
+| `tests/demo_live_match.py --scenario reconnect` / `disconnect` | Hai kịch bản chạy một mạch trên TCP thật + PostgreSQL thật |
+| `tests/demo_manual.py` | Bảng điều khiển tay: tự gõ lệnh cho hai bot rớt mạng / vào lại, xem từng bản tin tới |
 
 ```bash
 cd Code/Server
 python -m unittest tests.test_message_handler
+python -m tests.test_connection_disconnect
 ```
-
-Chưa có test nào chạy trên TCP thật + PostgreSQL thật cho hai kịch bản
-reconnect / disconnect; phần đó hiện chỉ kiểm tra bằng tay khi demo.
 
 ---
 
